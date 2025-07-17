@@ -6,7 +6,7 @@ import { InfiniteMovingCardsDemo } from "@/component-landing/Testimonials";
 import { FAQAccordion } from "@/component-landing/FAQs";
 import { WobbleCardDemo } from "@/component-landing/wooblecards";
 import BackgroundLinesDemo from "./landing-pages/hero/page";
-import { HeroScrollDemo } from "./landing-pages/screen-upload/page";
+import HeroScrollDemo from "./landing-pages/screen-upload/page";
 
 import { useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
