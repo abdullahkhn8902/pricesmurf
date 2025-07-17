@@ -7,7 +7,7 @@ import { AiOutlineSolution } from "react-icons/ai";
 import { FaRocket } from "react-icons/fa6";
 
 
-export function HeroScrollDemo() {
+export default function HeroScrollDemo() {
   return (
     <div className="flex flex-col overflow-hidden  ">
       <section className="bg-white dark:bg-gray-900 ">
