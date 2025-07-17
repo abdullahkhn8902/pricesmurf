@@ -27,7 +27,15 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body suppressHydrationWarning>
-        <ClerkProvider>
+        <ClerkProvider
+          publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+          appearance={{
+            variables: { colorPrimary: '#000000' },
+            elements: {
+              formButtonPrimary: 'bg-black border border-black border-solid hover:bg-white hover:text-black',
+            }
+          }}
+        >
           <ClientLayout>{children}</ClientLayout>
         </ClerkProvider>
       </body>
