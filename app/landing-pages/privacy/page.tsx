@@ -3,7 +3,7 @@ import React from "react";
 
 import { twMerge } from "tailwind-merge";
 import { TracingBeam } from "@/component-landing/ui/tracing-beam";
-import { NavbarDemo } from "@/component-landing/Navbar";
+import { NavbarDemo } from "@/component-app/Navbar";
 import { Footer } from "@/component-landing/Footer";
 
 export default function TracingBeamDemo() {

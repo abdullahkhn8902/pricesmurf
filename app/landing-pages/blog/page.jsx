@@ -1,5 +1,5 @@
 import React from "react";
-import { NavbarDemo } from "@/component-landing/Navbar";
+import { NavbarDemo } from "@/component-app/Navbar";
 import { Footer } from "@/component-landing/Footer";
 
 export default function Blog() {
