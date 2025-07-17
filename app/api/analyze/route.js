@@ -4,14 +4,8 @@ import { parse } from 'csv-parse/sync';
 import * as XLSX from 'xlsx';
 import { NextResponse } from 'next/server';
 
-const uri = process.env.MONGODB_URI;
-const client = new MongoClient(uri);
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-
-async function getGridFSBucket() {
-    await client.connect();
-    return new GridFSBucket(client.db('Project0'), { bucketName: 'excelFiles' });
-}
+// Prevent static analysis during build
+export const dynamic = 'force-dynamic';
 
 async function processFileData(buffer, filename, contentType) {
     let columns = [];
@@ -34,7 +28,7 @@ async function processFileData(buffer, filename, contentType) {
         // Safe filename check
         if (filename && typeof filename === 'string') {
             const lowerName = filename.toLowerCase();
-            if (lowerName.indexOf('.csv') === lowerName.length - 4) return true;
+            if (lowerName.endsWith('.csv')) return true;
         }
 
         return false;
@@ -53,7 +47,6 @@ async function processFileData(buffer, filename, contentType) {
 
         columns = rawColumns.map(col => {
             const colText = col?.toString()?.trim() || 'Unnamed';
-            // Safe character replacement
             return colText.replace(/[^a-zA-Z0-9\s_-]/g, '');
         });
 
@@ -72,7 +65,6 @@ async function processFileData(buffer, filename, contentType) {
 
         columns = rawColumns.map(col => {
             const colText = col?.toString()?.trim() || 'Unnamed';
-            // Safe character replacement
             return colText.replace(/[^a-zA-Z0-9\s_-]/g, '');
         });
 
@@ -85,17 +77,31 @@ async function processFileData(buffer, filename, contentType) {
     return { columns, data };
 }
 
-async function storeAnalysis(fileId, userId, analysis) {
-    const db = client.db('Project0');
-    await db.collection('analyses').updateOne(
-        { fileId: new ObjectId(fileId), userId },
-        { $set: { analysis, updatedAt: new Date() } },
-        { upsert: true }
-    );
-}
-
 export async function POST(request) {
+    const uri = process.env.MONGODB_URI;
+    const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+
+    if (!uri) {
+        return NextResponse.json(
+            { error: 'MONGODB_URI missing in environment variables' },
+            { status: 500 }
+        );
+    }
+
+    if (!OPENROUTER_API_KEY) {
+        return NextResponse.json(
+            { error: 'OPENROUTER_API_KEY missing in environment variables' },
+            { status: 500 }
+        );
+    }
+
+    const client = new MongoClient(uri);
+
     try {
+        await client.connect();
+        const db = client.db('Project0');
+        const bucket = new GridFSBucket(db, { bucketName: 'excelFiles' });
+
         const { searchParams } = new URL(request.url);
         const fileId = searchParams.get('fileId');
         const { customPrompt } = await request.json();
@@ -108,8 +114,7 @@ export async function POST(request) {
         }
 
         // Get file metadata
-        const bucket = await getGridFSBucket();
-        const filesCollection = client.db('Project0').collection('excelFiles.files');
+        const filesCollection = db.collection('excelFiles.files');
         const file = await filesCollection.findOne({
             _id: new ObjectId(fileId),
             'metadata.userId': userId
@@ -176,7 +181,11 @@ export async function POST(request) {
         const analysis = result.choices[0]?.message?.content?.trim() || 'No analysis generated';
 
         // Store analysis in database
-        await storeAnalysis(fileId, userId, analysis);
+        await db.collection('analyses').updateOne(
+            { fileId: new ObjectId(fileId), userId },
+            { $set: { analysis, updatedAt: new Date() } },
+            { upsert: true }
+        );
 
         // Safe filename splitting
         const sheetName = filename.includes('.')

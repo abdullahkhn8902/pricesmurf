@@ -130,6 +130,23 @@ function parseAIResponse(response) {
 }
 
 export async function POST(request) {
+    const uri = process.env.MONGODB_URI;
+    const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+
+    if (!uri) {
+        return NextResponse.json(
+            { error: 'MONGODB_URI missing in environment variables' },
+            { status: 500 }
+        );
+    }
+
+    if (!OPENROUTER_API_KEY) {
+        return NextResponse.json(
+            { error: 'OPENROUTER_API_KEY missing in environment variables' },
+            { status: 500 }
+        );
+    }
+
     let client;
     const startTime = Date.now(); // Track total execution time
 
@@ -150,9 +167,6 @@ export async function POST(request) {
             );
         }
         processingLocks.set(sessionId, true);
-
-        const uri = process.env.MONGODB_URI;
-        if (!uri) throw new Error('MONGODB_URI missing in .env.local');
 
         client = new MongoClient(uri);
         await client.connect();
@@ -269,11 +283,6 @@ COLUMN STANDARDIZATION PRINCIPLES:
         }
 
         console.log('Sending request to OpenRouter API...');
-        const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-        if (!OPENROUTER_API_KEY) {
-            processingLocks.delete(sessionId);
-            throw new Error('OPENROUTER_API_KEY is missing in environment variables');
-        }
 
         const domain = process.env.NODE_ENV === 'development'
             ? 'http://localhost:3000'
