@@ -24,7 +24,6 @@ async function processFileData(buffer, filename, contentType) {
         }, {});
     };
 
-    // FIX: Completely removed startsWith/endsWith usage
     const isCSV = () => {
         // Safe content type check
         if (contentType && typeof contentType === 'string') {

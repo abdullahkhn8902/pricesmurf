@@ -4,14 +4,19 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import ExcelJS from 'exceljs';
 
+// Prevent static analysis during build
+export const dynamic = 'force-dynamic';
+
 // In-memory lock to prevent concurrent processing
 const processingLocks = new Map();
 
 // Helper to parse NDJSON (newline-delimited JSON)
 function parseNDJSON(text) {
+    if (!text || typeof text !== 'string') return [];
+
     return text
         .split('\n')
-        .filter(line => line.trim())
+        .filter(line => line && line.trim())
         .map(line => {
             try {
                 return JSON.parse(line);
@@ -24,6 +29,12 @@ function parseNDJSON(text) {
 
 // Enhanced JSON parsing with multiple fallback strategies
 function parseAIResponse(response) {
+    // Validate input
+    if (typeof response !== 'string') {
+        console.error('parseAIResponse: Response is not a string', typeof response);
+        throw new Error('Response must be a string');
+    }
+
     // Remove code block markers and trim
     let cleanResponse = response.replace(/```(json)?/g, '').trim();
 
@@ -65,13 +76,13 @@ function parseAIResponse(response) {
     // Attempt 3: NDJSON parsing (newline-delimited JSON)
     try {
         const lines = cleanResponse.split('\n')
-            .map(line => line.trim())
+            .map(line => line ? line.trim() : '')
             .filter(line => line && (line.startsWith('{') || line.startsWith('[')));
 
         // Add null check for lines array
         if (lines && lines.length > 0) {
-            // Add null/undefined check before accessing lines[0]
-            if (lines[0] && lines[0].startsWith('[')) {
+            // Safe check for first line
+            if (lines[0] && typeof lines[0] === 'string' && lines[0].startsWith('[')) {
                 const joined = lines.join('').replace(/\]\s*\[/g, ',');
                 return JSON.parse(joined);
             }
@@ -81,7 +92,7 @@ function parseAIResponse(response) {
             for (const line of lines) {
                 try {
                     // Add null check for line
-                    if (line) {
+                    if (line && typeof line === 'string') {
                         const parsed = JSON.parse(line.replace(/,\s*}$/, '}'));
                         objects.push(parsed);
                     }
@@ -443,6 +454,8 @@ COLUMN STANDARDIZATION PRINCIPLES:
             { status: 500 }
         );
     } finally {
-        client?.close();
+        if (client) {
+            await client.close();
+        }
     }
 }
