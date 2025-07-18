@@ -77,23 +77,23 @@ export function Footer() {
                     className="grid grid-cols-1 gap-8 border-t border-gray-100 pt-8 sm:grid-cols-2 lg:grid-cols-4 lg:pt-16"
                 >
                     <div>
-                        <p className="font-medium text-white">Services</p>
+                        <p className="font-medium text-white">Blogs</p>
 
                         <ul className="mt-6 space-y-4 text-sm">
                             <li>
-                                <a href="#" className="text-white transition hover:opacity-75"> Data Management </a>
+                                <a href="/landing-pages/blog" className="text-white transition hover:opacity-75"> Data Management </a>
                             </li>
                             <li>
-                                <a href="#" className="text-white transition hover:opacity-75"> AI Data Analysis </a>
+                                <a href="/landing-pages/blog" className="text-white transition hover:opacity-75"> AI Data Analysis </a>
                             </li>
                             <li>
-                                <a href="#" className="text-white transition hover:opacity-75"> File Integration </a>
+                                <a href="/landing-pages/blog" className="text-white transition hover:opacity-75"> File Integration </a>
                             </li>
                             <li>
-                                <a href="#" className="text-white transition hover:opacity-75"> Custom Prompt Setup </a>
+                                <a href="/landing-pages/blog" className="text-white transition hover:opacity-75"> Custom Prompt Setup </a>
                             </li>
                             <li>
-                                <a href="#" className="text-white transition hover:opacity-75"> Data Optimization </a>
+                                <a href="/landing-pages/blog" className="text-white transition hover:opacity-75"> Data Optimization </a>
                             </li>
                         </ul>
                     </div>
@@ -103,7 +103,7 @@ export function Footer() {
 
                         <ul className="mt-6 space-y-4 text-sm">
                             <li>
-                                <a href="/about" className="text-white transition hover:opacity-75"> About </a>
+                                <a href="/landing-pages/about" className="text-white transition hover:opacity-75"> About </a>
                             </li>
 
 
@@ -116,7 +116,7 @@ export function Footer() {
 
                         <ul className="mt-6 space-y-4 text-sm">
                             <li>
-                                <a href="/privacy" className="text-white transition hover:opacity-75"> Privacy Policy </a>
+                                <a href="/landing-pages/privacy" className="text-white transition hover:opacity-75"> Privacy Policy </a>
                             </li>
 
 

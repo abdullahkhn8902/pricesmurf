@@ -50,10 +50,10 @@ function Navbar({ className }: { className?: string }) {
             href: "/features",
             content: (
                 <div className="text-sm grid grid-cols-1 md:grid-cols-2 gap-4 p-4 text-white">
-                    <ProductItem title="File Upload" href="/features" src="/upload.png" description="Easily upload, edit, and delete your company data." />
-                    <ProductItem title="Data Management" href="/features" src="/dashboard.png" description="Get instant insights with powerful AI tools." />
-                    <ProductItem title="Custom Prompts" href="/features" src="/customprompt.png" description="Combine multiple files for unified analysis." />
-                    <ProductItem title="AI Data Analysis" href="/features" src="/aianalyse.png" description="Create tailored AI prompts for specific needs." />
+                    <ProductItem title="File Upload" href="/landing-pages/features" src="/upload.png" description="Easily upload, edit, and delete your company data." />
+                    <ProductItem title="Data Management" href="/landing-pages/features" src="/dashboard.png" description="Get instant insights with powerful AI tools." />
+                    <ProductItem title="Custom Prompts" href="/landing-pages/features" src="/customprompt.png" description="Combine multiple files for unified analysis." />
+                    <ProductItem title="AI Data Analysis" href="/landing-pages/features" src="/aianalyse.png" description="Create tailored AI prompts for specific needs." />
                 </div>
             ),
         },
@@ -62,9 +62,9 @@ function Navbar({ className }: { className?: string }) {
             href: "/pricing",
             content: (
                 <div className="flex flex-col space-y-4 text-sm">
-                    <HoveredLink href="/pricing">Basic</HoveredLink>
-                    <HoveredLink href="/pricing">Growth</HoveredLink>
-                    <HoveredLink href="/pricing">Premium</HoveredLink>
+                    <HoveredLink href="/landing-pages/pricing">Basic</HoveredLink>
+                    <HoveredLink href="/landing-pages/pricing">Growth</HoveredLink>
+                    <HoveredLink href="/landing-pages/pricing">Premium</HoveredLink>
                 </div>
             ),
         },
@@ -73,10 +73,10 @@ function Navbar({ className }: { className?: string }) {
             href: "/blog",
             content: (
                 <div className="flex flex-col space-y-4 text-sm py-5">
-                    <HoveredLink href="/blog">Data Management Tips</HoveredLink>
-                    <HoveredLink href="/blog">AI Insights</HoveredLink>
-                    <HoveredLink href="/blog">File Integration Strategies</HoveredLink>
-                    <HoveredLink href="/blog">Data Optimization</HoveredLink>
+                    <HoveredLink href="/landing-pages/blog">Data Management Tips</HoveredLink>
+                    <HoveredLink href="/landing-pages/blog">AI Insights</HoveredLink>
+                    <HoveredLink href="/landing-pages/blog">File Integration Strategies</HoveredLink>
+                    <HoveredLink href="/landing-pages/blog">Data Optimization</HoveredLink>
                 </div>
             ),
         },

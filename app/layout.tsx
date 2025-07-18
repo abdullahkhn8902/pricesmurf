@@ -19,6 +19,12 @@ export const metadata: Metadata = {
   description: "App description",
 };
 
+// Ensure Clerk environment variables are loaded at build time
+const clerkPubKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+if (!clerkPubKey) {
+  throw new Error("Missing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY environment variable");
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -28,7 +34,7 @@ export default function RootLayout({
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body suppressHydrationWarning>
         <ClerkProvider
-          publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+          publishableKey={clerkPubKey}
           appearance={{
             variables: { colorPrimary: '#000000' },
             elements: {
