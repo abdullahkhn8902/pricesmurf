@@ -6,18 +6,15 @@ import { FaStream } from "react-icons/fa";
 import { AiOutlineSolution } from "react-icons/ai";
 import { FaRocket } from "react-icons/fa6";
 
-
 export default function HeroScrollDemo() {
   return (
-    <div className="flex flex-col overflow-hidden  ">
-      <section className="bg-white dark:bg-gray-900 ">
+    <div className="flex flex-col overflow-hidden">
+      <section className="bg-white">
         <div className="py-8 lg:py-16 mx-auto max-w-screen-xl px-4">
-
-          <div className="grid grid-cols-2 gap-8 text-gray-500 sm:gap-12 md:grid-cols-3 lg:grid-cols-6 dark:text-gray-400">
-            {/* Logo 1 */}
+          <div className="grid grid-cols-2 gap-8 text-gray-500 sm:gap-12 md:grid-cols-3 lg:grid-cols-6">
             <a href="#" className="flex justify-center items-center">
               <svg
-                className="h-9 hover:text-indigo-900 dark:hover:text-white"
+                className="h-9 hover:text-indigo-900 "
                 viewBox="0 0 125 35"
                 fill="currentColor"
                 xmlns="http://www.w3.org/2000/svg"
@@ -33,7 +30,7 @@ export default function HeroScrollDemo() {
             {/* Logo 2 */}
             <a href="#" className="flex justify-center items-center">
               <svg
-                className="h-9 hover:text-indigo-900 dark:hover:text-white"
+                className="h-9 hover:text-indigo-900 "
                 viewBox="0 0 86 29"
                 fill="currentColor"
                 xmlns="http://www.w3.org/2000/svg"
@@ -49,7 +46,7 @@ export default function HeroScrollDemo() {
             {/* Logo 3 */}
             <a href="#" className="flex justify-center items-center">
               <svg
-                className="h-9 hover:text-indigo-900 dark:hover:text-white"
+                className="h-9 hover:text-indigo-900 "
                 viewBox="0 0 151 34"
                 fill="currentColor"
                 xmlns="http://www.w3.org/2000/svg"
@@ -69,7 +66,7 @@ export default function HeroScrollDemo() {
             {/* Logo 4 */}
             <a href="#" className="flex justify-center items-center">
               <svg
-                className="h-9 hover:text-gray-900 dark:hover:text-white"
+                className="h-9 hover:text-gray-900 "
                 viewBox="0 0 124 38"
                 fill="currentColor"
                 xmlns="http://www.w3.org/2000/svg"
@@ -82,7 +79,7 @@ export default function HeroScrollDemo() {
             {/* Logo 5 */}
             <a href="#" className="flex justify-center items-center">
               <svg
-                className="h-9 hover:text-gray-900 dark:hover:text-white"
+                className="h-9 hover:text-gray-900 "
                 viewBox="0 0 137 37"
                 fill="currentColor"
                 xmlns="http://www.w3.org/2000/svg"
@@ -111,7 +108,7 @@ export default function HeroScrollDemo() {
             {/* Logo 6 */}
             <a href="#" className="flex justify-center items-center">
               <svg
-                className="h-6 hover:text-gray-900 dark:hover:text-white"
+                className="h-6 hover:text-gray-900 "
                 viewBox="0 0 124 21"
                 fill="currentColor"
                 xmlns="http://www.w3.org/2000/svg"
@@ -161,13 +158,15 @@ export default function HeroScrollDemo() {
           </div>
         </div>
       </section>
+
       <ContainerScroll
         titleComponent={
           <>
-            <h1 className="text-4xl font-semibold text-indigo-900 dark:text-white ">
+            <h1 className="text-4xl font-semibold text-indigo-900">
               Unleash the power of <br />
               <span className="text-4xl md:text-[6rem] font-bold mt-1 leading-none">
-                PRICESMURF              </span>
+                PRICESMURF
+              </span>
             </h1>
           </>
         }
@@ -181,44 +180,25 @@ export default function HeroScrollDemo() {
           draggable={false}
         />
       </ContainerScroll>
-      <section>
-        {/* Container */}
-        <div className="mx-auto w-full max-w-7xl px-5 py-16 md:px-10 md:py-20 b">
-          {/* Title */}
 
-          {/* List */}
+      <section className="bg-white">
+        <div className="mx-auto w-full max-w-7xl px-5 py-16 md:px-10 md:py-20 ">
           <ul className="grid gap-5 sm:grid-cols-2 md:grid-cols-4 md:gap-0">
-            <li className="flex flex-col items-center gap-6 md:border-r md:px-10 md:py-4 p-8 md:border-gray-300">
-              <FaHeadset className="h-16 w-16 text-indigo-900" />
-              <p className="text-xl font-semibold text-indigo-900">Support</p>
-              <p className="text-center text-sm text-indigo-900">
-                24/7 AI Assistance for Your Business Needs              </p>
-            </li>
-            <li className="flex flex-col items-center gap-6 md:border-r md:px-10 md:py-4 p-8 md:border-gray-300">
-              <FaStream className="h-16 w-16 text-indigo-900" />
-              <p className="text-xl font-semibold text-indigo-900">Organise</p>
-              <p className="text-center text-sm text-indigo-900">
-                Streamline Your Data with Ease
-              </p>
-            </li>
-            <li className="flex flex-col items-center gap-6 md:border-r md:px-10 md:py-4 p-8 md:border-gray-300">
-              <AiOutlineSolution className="h-16 w-16 text-indigo-900" />
-              <p className="text-xl font-semibold text-indigo-900">Flexibility</p>
-              <p className="text-center text-sm text-indigo-900">
-                Tailored Solutions for Every Company
-              </p>
-            </li>
-            <li className="flex flex-col items-center gap-6 md:border-r md:px-10 md:py-4 p-8 md:border-gray-300">
-              <FaRocket className="h-16 w-16 text-indigo-900" />
-              <p className="text-xl font-semibold text-indigo-900">Speed</p>
-              <p className="text-center text-sm text-indigo-900">
-                Fast, AI-Powered Insights at Your Fingertips
-              </p>
-            </li>
+            {[
+              { Icon: FaHeadset, title: "Support", text: "24/7 AI Assistance for Your Business Needs" },
+              { Icon: FaStream, title: "Organise", text: "Streamline Your Data with Ease" },
+              { Icon: AiOutlineSolution, title: "Flexibility", text: "Tailored Solutions for Every Company" },
+              { Icon: FaRocket, title: "Speed", text: "Fast, AI-Powered Insights at Your Fingertips" },
+            ].map(({ Icon, title, text }, idx) => (
+              <li key={idx} className="flex flex-col items-center gap-6 md:border-r md:px-10 md:py-4 p-8 md:border-gray-300">
+                <Icon className="h-16 w-16 text-indigo-900" />
+                <p className="text-xl font-semibold text-indigo-900">{title}</p>
+                <p className="text-center text-sm text-indigo-900">{text}</p>
+              </li>
+            ))}
           </ul>
         </div>
       </section>
-
     </div>
   );
 }

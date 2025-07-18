@@ -5,16 +5,18 @@ import { InfiniteMovingCards } from "./ui/infinite-moving-cards";
 
 export function InfiniteMovingCardsDemo() {
     return (
-        <div className="h-[40rem] rounded-md flex flex-col antialiased bg-white dark:bg-black dark:bg-grid-white/[0.05] items-center justify-center relative overflow-hidden">
-            <h1 className="text-4xl font-semibold text-indigo-900 dark:text-white m-5">
-                What our clients say<br />
-            </h1>
-            <InfiniteMovingCards
-                items={testimonials}
-                direction="right"
-                speed="normal"
-            />
-        </div>
+        <section className="bg-white">
+            <div className="h-[40rem] rounded-md flex flex-col antialiased  items-center justify-center relative overflow-hidden">
+                <h1 className="text-4xl font-semibold text-indigo-900  m-5">
+                    What our clients say<br />
+                </h1>
+                <InfiniteMovingCards
+                    items={testimonials}
+                    direction="right"
+                    speed="normal"
+                />
+            </div>
+        </section>
     );
 }
 

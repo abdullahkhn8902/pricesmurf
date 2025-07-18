@@ -47,7 +47,7 @@ function Navbar({ className }: { className?: string }) {
     const menuItems = [
         {
             item: "Features",
-            href: "/features",
+            href: "/landing-pages/features",
             content: (
                 <div className="text-sm grid grid-cols-1 md:grid-cols-2 gap-4 p-4 text-white">
                     <ProductItem title="File Upload" href="/landing-pages/features" src="/upload.png" description="Easily upload, edit, and delete your company data." />
@@ -59,7 +59,7 @@ function Navbar({ className }: { className?: string }) {
         },
         {
             item: "Pricing",
-            href: "/pricing",
+            href: "/landing-pages/pricing",
             content: (
                 <div className="flex flex-col space-y-4 text-sm">
                     <HoveredLink href="/landing-pages/pricing">Basic</HoveredLink>
@@ -70,7 +70,7 @@ function Navbar({ className }: { className?: string }) {
         },
         {
             item: "Blog",
-            href: "/blog",
+            href: "/landing-pages/blog",
             content: (
                 <div className="flex flex-col space-y-4 text-sm py-5">
                     <HoveredLink href="/landing-pages/blog">Data Management Tips</HoveredLink>
@@ -164,10 +164,10 @@ function Navbar({ className }: { className?: string }) {
                     exit={{ opacity: 0, y: -20 }}
                     className="fixed inset-0 bg-indigo-900 z-40 overflow-y-auto md:hidden"
                 >
-                    <div className="sticky top-0 bg-indigo-900 z-50 py-4 px-4 flex justify-end border-b border-gray-200 dark:border-gray-700">
+                    <div className="sticky top-0 bg-indigo-900 z-50 py-4 px-4 flex justify-end border-b border-gray-200 dark:border-gray-200">
                         <button
                             onClick={closeMobileMenu}
-                            className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200"
+                            className="p-2 rounded-full bg-gray-100 dark:bg-gray-100 text-gray-700 dark:text-gray-700"
                             aria-label="Close menu"
                         >
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -181,7 +181,7 @@ function Navbar({ className }: { className?: string }) {
                         <div className="flex flex-col space-y-6">
                             {menuItems.map((menu, index) => (
                                 <div key={index}>
-                                    <div className="flex justify-between items-center w-full border-b border-gray-200 dark:border-gray-700">
+                                    <div className="flex justify-between items-center w-full border-b border-gray-200 dark:border-gray-200">
                                         <Link href={menu.href} className="text-xl font-medium py-3 flex-1 text-white" onClick={closeMobileMenu}>
                                             {menu.item}
                                         </Link>

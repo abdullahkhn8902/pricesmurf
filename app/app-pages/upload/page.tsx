@@ -162,7 +162,7 @@ export default function FileUploadDemo() {
 
 
     return (
-        <div className="w-full max-w-4xl mx-auto min-h-96 border border-dashed bg-white dark:bg-black border-indigo-900 dark:border-neutral-800 rounded-lg m-20 mt-[10rem]">
+        <div className="w-full max-w-4xl mx-auto min-h-96 border border-dashed bg-white  border-indigo-900  rounded-lg m-20 mt-[10rem]">
             <FileUpload files={files} onChange={handleFilesChange} />
 
             <div className="mt-4 flex gap-4  m-5">
@@ -198,7 +198,7 @@ export default function FileUploadDemo() {
                     {uploadStatus.success && (
                         <div className="py-5  flex items-center justify-center  ">
                             <Modal>
-                                <ModalTrigger className="bg-black dark:bg-white dark:text-black text-white flex justify-center group/modal-btn">
+                                <ModalTrigger className="bg-black  text-white flex justify-center group/modal-btn">
                                     <span className="px-5 group-hover/modal-btn:translate-x-40 text-center transition duration-500">
                                         Done
                                     </span>
@@ -208,9 +208,9 @@ export default function FileUploadDemo() {
                                 </ModalTrigger>
                                 <ModalBody>
                                     <ModalContent>
-                                        <h4 className="text-lg md:text-2xl text-neutral-600 dark:text-neutral-100 font-bold text-center mb-8">
+                                        <h4 className="text-lg md:text-2xl text-neutral-600  font-bold text-center mb-8">
                                             Help us understand your {" "}
-                                            <span className="px-1 py-0.5 rounded-md bg-gray-100 dark:bg-neutral-800 dark:border-neutral-700 border border-gray-200">
+                                            <span className="px-1 py-0.5 rounded-md bg-gray-100  border border-gray-200">
                                                 requirement
                                             </span>{" "}
                                             more! 📊
@@ -290,7 +290,7 @@ export default function FileUploadDemo() {
                                         <button
                                             onClick={handleCombineAndRedirect}
                                             disabled={isProcessing || !metadataSaved}
-                                            className="group mt-4 mx-auto flex w-fit items-center justify-between gap-4 rounded-lg border border-indigo-900 bg-indigo-900 px-6 py-2 transition-colors hover:bg-transparent focus:ring-3 focus:outline-none disabled:opacity-50"
+                                            className="group mt-4 mx-auto flex w-fit items-center justify-between gap-4 rounded-lg border border-indigo-900 bg-indigo-900 px-6 py-2 transition-colors  focus:ring-3 focus:outline-none disabled:opacity-50"
                                         >
                                             {isProcessing ? (
                                                 <span className="font-medium text-white flex items-center gap-2">
@@ -298,7 +298,7 @@ export default function FileUploadDemo() {
                                                     Processing...
                                                 </span>
                                             ) : (
-                                                <span className="font-medium text-white transition-colors group-hover:text-indigo-900">
+                                                <span className="font-medium text-white transition-colors ">
                                                     Done
                                                 </span>
                                             )}

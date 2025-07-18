@@ -6,7 +6,7 @@ export default function Features() {
     return (
         <>
             <NavbarDemo />
-            <section>
+            <section className="bg-white">
                 {/* Container */}
                 <div className="mx-auto w-full max-w-7xl px-5 py-24 md:px-10 md:py-33 h-full">
                     {/* Component */}

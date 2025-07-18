@@ -124,7 +124,7 @@ export function Footer() {
                     </div>
                 </div>
 
-                <p className="text-xs text-white">&copy; 2022. Pricesmurf. All rights reserved.</p>
+                <p className="text-xs text-white">&copy; 2025. Pricesmurf. All rights reserved.</p>
             </div>
         </footer>
     );

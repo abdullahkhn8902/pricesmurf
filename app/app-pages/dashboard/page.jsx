@@ -31,14 +31,14 @@ export default function SidebarDemo() {
             label: "Dashboard",
             href: "/app-pages/dashboard",
             icon: (
-                <IconBrandTabler className="h-5 w-5 shrink-0 text-white dark:text-neutral-200" />
+                <IconBrandTabler className="h-5 w-5 shrink-0 text-white " />
             ),
         },
         {
             label: "Upload a file",
             href: "/app-pages/upload",
             icon: (
-                <FaFileExcel className="h-5 w-5 shrink-0 text-white dark:text-neutral-200" />
+                <FaFileExcel className="h-5 w-5 shrink-0 text-white " />
             ),
         }
     ];
@@ -47,7 +47,7 @@ export default function SidebarDemo() {
     return (
         <div
             className={cn(
-                "mx-auto flex w-screen flex-1 flex-col overflow-hidden rounded-md border border-neutral-200 bg-gray-100 md:flex-row dark:border-neutral-700 dark:bg-neutral-800  ",
+                "mx-auto flex w-screen flex-1 flex-col overflow-hidden rounded-md border border-neutral-200 bg-gray-100 md:flex-row   ",
                 "h-screen ",
             )}
         >
@@ -250,13 +250,13 @@ const Dashboard = () => {
 
     return (
         <div className="flex flex-1">
-            <div className="flex w-full flex-1 flex-col gap-2 rounded-tl-2xl border border-neutral-200 bg-gray-200 p-2 md:p-10 dark:border-neutral-700 dark:bg-neutral-900">
+            <div className="flex w-full flex-1 flex-col gap-2 rounded-tl-2xl border border-neutral-200 bg-gray-200 p-2 md:p-10 ">
                 <div className="flex justify-between items-center mt-2 px-4">
-                    <div className="text-xl font-bold text-center w-full">{sheetName}</div>
+                    <div className="text-xl font-bold text-center w-full dark:text-indigo-900">{sheetName}</div>
                     <div className="flex gap-2">
                         <button
                             onClick={handleCustomAnalyze}
-                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 "
                         >
                             Custom Analyze
                         </button>
@@ -273,17 +273,17 @@ const Dashboard = () => {
                 {showCustomPromptModal && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                         <div className="bg-white p-6 rounded-lg w-full max-w-2xl">
-                            <h3 className="text-lg font-semibold mb-4">Custom Analysis Prompt</h3>
+                            <h3 className="text-lg font-semibold mb-4 dark:text-black">Custom Analysis Prompt</h3>
                             <textarea
                                 value={customPrompt}
                                 onChange={(e) => setCustomPrompt(e.target.value)}
                                 placeholder="Enter your custom analysis instructions..."
-                                className="w-full h-40 p-3 border rounded-lg mb-4"
+                                className="w-full h-40 p-3 border rounded-lg mb-4 dark:border-black dark:text-black"
                             />
                             <div className="flex justify-end gap-2">
                                 <button
                                     onClick={() => setShowCustomPromptModal(false)}
-                                    className="px-4 py-2 bg-gray-300 rounded-lg"
+                                    className="px-4 py-2 bg-gray-300 rounded-lg dark:text-black"
                                 >
                                     Cancel
                                 </button>
@@ -317,11 +317,11 @@ const Dashboard = () => {
 
                 <div className="mx-auto w-full md:w-[40rem] lg:w-[55rem] xl:w-[80rem] mt-4">
                     <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Select File</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-indigo-900">Select File</label>
                         <select
                             value={selectedFileId}
                             onChange={(e) => setSelectedFileId(e.target.value)}
-                            className="w-full border rounded-lg p-2"
+                            className="w-full border rounded-lg p-2 dark:bg-indigo-900"
                             disabled={isLoading}
                         >
                             <option value="">Select a file</option>
@@ -338,8 +338,8 @@ const Dashboard = () => {
                     {error && <div className="text-center text-red-600 mb-4">{error}</div>}
                     {!isLoading && !error && (
                         <div className="relative overflow-auto shadow-md sm:rounded-lg max-h-[80vh]">
-                            <table className="min-w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                                <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                            <table className="min-w-full text-sm text-left text-gray-500 ">
+                                <thead className="text-xs text-gray-700 uppercase bg-gray-50 ">
                                     <tr>
                                         {columns.map((header) => (
                                             <th key={header} className="px-6 py-3">{header}</th>
@@ -349,13 +349,13 @@ const Dashboard = () => {
                                 </thead>
                                 <tbody>
                                     {data.map((row, index) => (
-                                        <tr key={index} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                        <tr key={index} className="bg-white border-b  hover:bg-gray-50 dark:hover:bg-gray-200">
                                             {columns.map((col) => (
                                                 <td key={col} className="px-6 py-4">{row[col] || ''}</td>
                                             ))}
                                             <td className="px-6 py-4 space-x-3">
-                                                <button onClick={() => handleEdit(index)} className="font-medium text-blue-600 dark:text-blue-500 hover:underline">Edit</button>
-                                                <button onClick={() => handleRemove(index)} className="font-medium text-red-600 dark:text-red-500 hover:underline">Remove</button>
+                                                <button onClick={() => handleEdit(index)} className="font-medium text-blue-600  hover:underline">Edit</button>
+                                                <button onClick={() => handleRemove(index)} className="font-medium text-red-600  hover:underline">Remove</button>
                                             </td>
                                         </tr>
                                     ))}
@@ -367,21 +367,21 @@ const Dashboard = () => {
                 {editingIndex !== null && (
                     <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 overflow-y-auto ">
                         <div className="bg-white p-5 rounded-lg shadow-lg w-full max-w-md overflow-y-auto">
-                            <h3 className="text-lg font-semibold mb-4">Edit Details</h3>
+                            <h3 className="text-lg font-semibold mb-4 dark:text-black">Edit Details</h3>
                             {columns.map((key) => (
                                 <div key={key} className="mb-3">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">{key}</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-black mb-1">{key}</label>
                                     <input
                                         type="text"
                                         name={key}
                                         value={editData[key] || ''}
                                         onChange={handleChange}
-                                        className="w-full border rounded-lg p-2"
+                                        className="w-full border rounded-lg p-2 dark:text-black"
                                     />
                                 </div>
                             ))}
                             <div className="flex justify-end space-x-2">
-                                <button onClick={() => setEditingIndex(null)} className="px-4 py-2 bg-gray-300 rounded-lg">Cancel</button>
+                                <button onClick={() => setEditingIndex(null)} className="px-4 py-2 bg-gray-300 rounded-lg dark:text-black">Cancel</button>
                                 <button
                                     disabled={editingIndex === null}
                                     onClick={handleSave}

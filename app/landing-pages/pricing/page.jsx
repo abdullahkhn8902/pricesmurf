@@ -7,17 +7,17 @@ export default function Pricing() {
         <>
             <NavbarDemo />
 
-            <section>
+            <section className="bg-white">
                 {/* Container */}
                 <div className="mx-auto max-w-7xl px-5 py-30 md:px-10 md:py-40">
                     {/* Heading Container */}
                     <div className="mx-auto mb-8 max-w-3xl text-center md:mb-12 lg:mb-16">
                         {/* Heading */}
-                        <h2 className="text-3xl font-bold md:text-5xl">
+                        <h2 className="text-3xl font-bold md:text-5xl text-indigo-900">
                             Simple & Affordable Pricing for Pricesmurf
                         </h2>
                         {/* Subheading */}
-                        <p className="mt-4 text-sm text-gray-500 sm:text-base">
+                        <p className="mt-4 text-sm text-indigo-900 sm:text-base">
                             Flexible plans with a 30-day money-back guarantee
                         </p>
                     </div>
@@ -25,7 +25,7 @@ export default function Pricing() {
                     {/* Price Container */}
                     <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-3 md:gap-4">
                         {/* Price - Basic */}
-                        <div className="mx-auto flex w-full max-w-md flex-col items-start rounded-md border border-gray-300 p-8">
+                        <div className="mx-auto flex w-full max-w-md flex-col items-start rounded-md border border-gray-300 p-8 text-indigo-900">
                             <div className="mb-4 rounded-md bg-black px-4 py-1.5">
                                 <p className="text-sm font-bold text-white sm:text-sm">BASIC</p>
                             </div>
@@ -53,7 +53,7 @@ export default function Pricing() {
                         </div>
 
                         {/* Price - Growth */}
-                        <div className="mx-auto flex w-full max-w-md flex-col items-start rounded-md border border-gray-300 bg-gray-100 p-8">
+                        <div className="mx-auto flex w-full max-w-md flex-col items-start rounded-md border border-gray-300 bg-gray-100 p-8 text-indigo-900">
                             <div className="mb-4 rounded-md bg-black px-4 py-1.5">
                                 <p className="text-sm font-bold text-white sm:text-sm">GROWTH</p>
                             </div>
@@ -81,7 +81,7 @@ export default function Pricing() {
                         </div>
 
                         {/* Price - Premium */}
-                        <div className="mx-auto flex w-full max-w-md flex-col items-start rounded-md border border-gray-300 p-8">
+                        <div className="mx-auto flex w-full max-w-md flex-col items-start rounded-md border border-gray-300 p-8 text-indigo-900">
                             <div className="mb-4 rounded-md bg-black px-4 py-1.5">
                                 <p className="text-sm font-bold text-white sm:text-sm">PREMIUM</p>
                             </div>
