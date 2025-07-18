@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   description: "App description",
 };
 
-// Ensure Clerk environment variables are loaded at build time
+// Add this validation
 const clerkPubKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 if (!clerkPubKey) {
   throw new Error("Missing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY environment variable");

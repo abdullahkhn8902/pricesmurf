@@ -1,6 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
-
 const isDashboardRoute = createRouteMatcher(['/dashboard(.*)', '/upload(.*)']);
 
 export default clerkMiddleware(
@@ -14,15 +13,14 @@ export default clerkMiddleware(
         }
 
         if (isDashboardRoute(req)) {
-            // Redirects to your configured sign‑in URL if userId is missing
+            // FIX: Use auth() instead of auth
             await auth.protect();
         }
+    },
+    { // FIX: Move debug option outside async function
         debug: process.env.NODE_ENV !== 'production'
-
     }
 );
-
-
 
 export const config = {
     matcher: [
