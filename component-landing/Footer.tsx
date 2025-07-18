@@ -57,7 +57,7 @@ export function Footer() {
                                 target="_blank"
                                 className="text-white transition hover:opacity-75"
                             >
-                                <span className="sr-only">Twitter</span>
+                                <span className="sr-only">X</span>
 
                                 <svg className="size-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                     <path
