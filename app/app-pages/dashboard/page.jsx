@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { Sidebar, SidebarBody, SidebarLink } from "@/component-app/ui/sidebar";
 import {
     IconBrandTabler,
@@ -23,7 +23,10 @@ import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 
-export default function SidebarDemo() {
+// Register Hourglass component
+
+// Create inner component for Sidebar that uses useSearchParams
+function SidebarContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const pathname = usePathname();
@@ -36,7 +39,7 @@ export default function SidebarDemo() {
         'Parameters': false,
         'Transactions': false,
         'Other Tables': false,
-        'Price Lists': false  // Add Price Lists category
+        'Price Lists': false
     });
     const [loading, setLoading] = useState(true);
     const [selectedFile, setSelectedFile] = useState(null);
@@ -46,7 +49,6 @@ export default function SidebarDemo() {
     useEffect(() => {
         setIsClient(true);
 
-        // Fetch data only on initial load or when sidebar opens
         if (initialLoadRef.current || open) {
             fetchSidebarData();
             initialLoadRef.current = false;
@@ -62,24 +64,22 @@ export default function SidebarDemo() {
             });
         }
 
-        // Initialize selected file from URL
         const fileId = searchParams.get('file');
         if (fileId) setSelectedFile(fileId);
-    }, [open]); const fetchSidebarData = async () => {
+    }, [open]);
+
+    const fetchSidebarData = async () => {
         try {
             const res = await fetch('/api/files?metadata=1');
             if (!res.ok) throw new Error('Failed to fetch files');
             const files = await res.json();
 
-            // Organize files into categories
             const organizedData = {
                 'Company Tables': {
                     icon: <IconBuilding className="h-5 w-5 shrink-0 text-white" />,
                     subcategories: {
                         'Products': { files: [] },
                         'Customers': { files: [] },
-                        // 'Extra Product Info': { files: [] },
-                        // 'Extra Customer Info': { files: [] }
                     }
                 },
                 'Parameters': {
@@ -103,26 +103,22 @@ export default function SidebarDemo() {
                         'Uncategorized': { files: [] }
                     }
                 },
-                // Add Price Lists category with no predefined subcategories
                 'Price Lists': {
                     icon: <IconCurrencyDollar className="h-5 w-5 shrink-0 text-white" />,
                     files: []
                 }
             };
 
-            // Categorize files
             files.forEach(file => {
                 const category = file.category || 'Other Tables';
                 const subcategory = file.subcategory || 'Uncategorized';
                 if (file.category === 'Price Lists') {
-                    // Add directly to Price Lists category
                     organizedData['Price Lists'].files.push({
                         id: file.id,
                         filename: file.filename,
                         readOnly: file.readOnly || false
                     });
                 } else {
-
                     if (organizedData[category] && organizedData[category].subcategories[subcategory]) {
                         organizedData[category].subcategories[subcategory].files.push({
                             id: file.id,
@@ -130,7 +126,6 @@ export default function SidebarDemo() {
                             readOnly: file.readOnly || false
                         });
                     } else {
-                        // Create new subcategory if it doesn't exist
                         if (!organizedData[category]) {
                             organizedData[category] = {
                                 icon: <IconFolder className="h-5 w-5 shrink-0 text-white" />,
@@ -193,19 +188,18 @@ export default function SidebarDemo() {
     return (
         <div
             className={cn(
-                "mx-auto flex w-screen flex-1 flex-col overflow-hidden rounded-md border border-neutral-200 bg-gray-100 md:flex-row   ",
-                "h-screen ",
+                "mx-auto flex w-screen flex-1 flex-col overflow-hidden rounded-md border border-neutral-200 bg-gray-100 md:flex-row",
+                "h-screen",
             )}
         >
             <Sidebar open={open} setOpen={setOpen}>
                 <SidebarBody className="justify-between gap-10">
-                    <div className="flex flex-1 flex-col overflow-x-hidden overflow-y-auto ">
-                        <div className="mt-8 flex flex-col gap-2 ">
+                    <div className="flex flex-1 flex-col overflow-x-hidden overflow-y-auto">
+                        <div className="mt-8 flex flex-col gap-2">
                             {links.map((link, idx) => (
                                 <SidebarLink key={idx} link={link} />
                             ))}
 
-                            {/* New Sidebar Structure */}
                             {loading ? (
                                 <div className="flex justify-center py-4">
                                     <Hourglass size="20" bgOpacity="0.1" speed="1.75" color="white" />
@@ -317,7 +311,7 @@ export default function SidebarDemo() {
                                     </div>
                                 ))
                             )}
-                            <div className="flex items-center gap-2  py-2 cursor-pointer text-white hover:bg-neutral-700 rounded">
+                            <div className="flex items-center gap-2 py-2 cursor-pointer text-white hover:bg-neutral-700 rounded">
                                 <SignedIn>
                                     <UserButton
                                         appearance={{
@@ -339,8 +333,8 @@ export default function SidebarDemo() {
     );
 }
 
-
-const Dashboard = ({ selectedFileId: propSelectedFileId }) => {
+// Create inner component for Dashboard that uses useSearchParams
+function DashboardContent({ selectedFileId: propSelectedFileId }) {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -380,7 +374,6 @@ const Dashboard = ({ selectedFileId: propSelectedFileId }) => {
             })
             .then(files => {
                 setFiles(files);
-                // Use prop if available, otherwise default to first file
                 if (propSelectedFileId && files.some(f => f.id === propSelectedFileId)) {
                     setSelectedFileId(propSelectedFileId);
                     const selectedFile = files.find(f => f.id === propSelectedFileId);
@@ -396,7 +389,7 @@ const Dashboard = ({ selectedFileId: propSelectedFileId }) => {
                 console.error('Error fetching files:', err);
             })
             .finally(() => setIsLoading(false));
-    }, [propSelectedFileId]); // Add prop to dependency array
+    }, [propSelectedFileId]);
 
     useEffect(() => {
         const fetchFileData = async () => {
@@ -427,7 +420,6 @@ const Dashboard = ({ selectedFileId: propSelectedFileId }) => {
     }, [selectedFileId]);
 
     useEffect(() => {
-        // Update URL when selectedFileId changes
         if (selectedFileId) {
             const params = new URLSearchParams(searchParams);
             params.set('file', selectedFileId);
@@ -441,7 +433,6 @@ const Dashboard = ({ selectedFileId: propSelectedFileId }) => {
             setIsReadOnly(selectedFile?.readOnly || false);
         }
     }, [selectedFileId, files]);
-
 
     const handleEdit = (index) => {
         setEditingIndex(index);
@@ -555,7 +546,6 @@ const Dashboard = ({ selectedFileId: propSelectedFileId }) => {
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Transformation failed');
 
-            // Update local state with transformed data
             setColumns(result.columns);
             setData(result.data);
 
@@ -580,7 +570,6 @@ const Dashboard = ({ selectedFileId: propSelectedFileId }) => {
             return;
         }
 
-        // Add new column to all rows
         const newData = data.map(row => ({
             ...row,
             [sanitized]: ''
@@ -599,7 +588,6 @@ const Dashboard = ({ selectedFileId: propSelectedFileId }) => {
             return;
         }
 
-        // Remove column from all rows
         const newData = data.map(row => {
             const newRow = { ...row };
             delete newRow[columnName];
@@ -613,7 +601,7 @@ const Dashboard = ({ selectedFileId: propSelectedFileId }) => {
 
     return (
         <div className="flex flex-1">
-            <div className="flex w-full flex-1 flex-col gap-2 rounded-tl-2xl border border-neutral-200 bg-gray-200 p-2 md:p-10 ">
+            <div className="flex w-full flex-1 flex-col gap-2 rounded-tl-2xl border border-neutral-200 bg-gray-200 p-2 md:p-10">
                 <div className="flex justify-between items-center mt-2 px-4">
                     <div className="text-xl font-bold text-center w-full dark:text-indigo-900">{sheetName}
                         {isReadOnly && (
@@ -623,11 +611,10 @@ const Dashboard = ({ selectedFileId: propSelectedFileId }) => {
                         )}
                     </div>
 
-
                     <div className="flex gap-2">
                         <button
                             onClick={handleCustomAnalyze}
-                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 "
+                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
                         >
                             Custom Analyze
                         </button>
@@ -649,7 +636,6 @@ const Dashboard = ({ selectedFileId: propSelectedFileId }) => {
                     </div>
                 </div>
 
-                {/* Custom Analyze Modal */}
                 {showCustomPromptModal && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                         <div className="bg-white p-6 rounded-lg w-full max-w-2xl">
@@ -679,7 +665,6 @@ const Dashboard = ({ selectedFileId: propSelectedFileId }) => {
                     </div>
                 )}
 
-                {/* Transform Data Modal */}
                 {showTransformModal && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                         <div className="bg-white p-6 rounded-lg w-full max-w-2xl">
@@ -711,7 +696,6 @@ const Dashboard = ({ selectedFileId: propSelectedFileId }) => {
                     </div>
                 )}
 
-                {/* Add Column Modal */}
                 {showAddColumnModal && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                         <div className="bg-white p-6 rounded-lg w-full max-w-md">
@@ -741,7 +725,6 @@ const Dashboard = ({ selectedFileId: propSelectedFileId }) => {
                     </div>
                 )}
 
-                {/* Remove Column Confirmation Modal */}
                 {columnToRemove && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                         <div className="bg-white p-6 rounded-lg w-full max-w-md">
@@ -771,7 +754,6 @@ const Dashboard = ({ selectedFileId: propSelectedFileId }) => {
                     </div>
                 )}
 
-                {/* Analysis Display */}
                 {analysis && (
                     <div className="mt-4 max-h-[40vh] overflow-y-auto bg-white p-4 rounded-lg shadow-md relative z-10">
                         <h3 className="text-lg font-semibold mb-2 text-indigo-900">PriceSmurf AI</h3>
@@ -818,7 +800,7 @@ const Dashboard = ({ selectedFileId: propSelectedFileId }) => {
                     {error && <div className="text-center text-red-600 mb-4">{error}</div>}
                     {!isLoading && !error && (
                         <div className="relative overflow-x-auto shadow-md sm:rounded-lg block max-h-[70vh] overflow-y-auto">
-                            <table className="min-w-full text-sm text-left text-gray-500 ">
+                            <table className="min-w-full text-sm text-left text-gray-500">
                                 <thead className="sticky top-0 text-xs text-gray-700 uppercase bg-gray-50 z-10">
                                     <tr>
                                         {columns.map((header) => (
@@ -827,7 +809,7 @@ const Dashboard = ({ selectedFileId: propSelectedFileId }) => {
                                                 {!isReadOnly && (
                                                     <button
                                                         onClick={() => setColumnToRemove(header)}
-                                                        className="absolute right-1 top-1/2 transform -translate-y-1/2 text-white opacity-0 group-hover:opacity-100 p-2 bg-red-200 rounded-full "
+                                                        className="absolute right-1 top-1/2 transform -translate-y-1/2 text-white opacity-0 group-hover:opacity-100 p-2 bg-red-200 rounded-full"
                                                         title={`Remove ${header} column`}
                                                     >
                                                         ❌
@@ -849,17 +831,18 @@ const Dashboard = ({ selectedFileId: propSelectedFileId }) => {
                                 </thead>
                                 <tbody>
                                     {data.map((row, index) => (
-                                        <tr key={index} className="bg-white border-b  hover:bg-gray-50 dark:hover:bg-gray-200">
+                                        <tr key={index} className="bg-white border-b hover:bg-gray-50 dark:hover:bg-gray-200">
                                             {columns.map((col) => (
                                                 <td key={col} className="px-6 py-4">{row[col] || ''}</td>
                                             ))}
                                             <td className="px-6 py-4 space-x-3">
                                                 {!isReadOnly && (
                                                     <>
-                                                        <button onClick={() => handleEdit(index)} className="font-medium text-blue-600  hover:underline">Edit</button>
-                                                        <button onClick={() => handleRemove(index)} className="font-medium text-red-600  hover:underline">Remove</button>
+                                                        <button onClick={() => handleEdit(index)} className="font-medium text-blue-600 hover:underline">Edit</button>
+                                                        <button onClick={() => handleRemove(index)} className="font-medium text-red-600 hover:underline">Remove</button>
                                                     </>
-                                                )}                                            </td>
+                                                )}
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -868,7 +851,7 @@ const Dashboard = ({ selectedFileId: propSelectedFileId }) => {
                     )}
                 </div>
                 {editingIndex !== null && !isReadOnly && (
-                    <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 overflow-y-auto ">
+                    <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 overflow-y-auto">
                         <div className="bg-white p-5 rounded-lg shadow-lg w-full max-w-md overflow-y-auto">
                             <h3 className="text-lg font-semibold mb-4 dark:text-black">Edit Details</h3>
                             {columns.map((key) => (
@@ -899,4 +882,30 @@ const Dashboard = ({ selectedFileId: propSelectedFileId }) => {
             </div>
         </div>
     );
-};
+}
+
+// Wrap DashboardContent with Suspense
+function Dashboard({ selectedFileId }) {
+    return (
+        <Suspense fallback={
+            <div className="flex justify-center items-center h-full">
+                <Hourglass size="30" color="#312e81" />
+            </div>
+        }>
+            <DashboardContent selectedFileId={selectedFileId} />
+        </Suspense>
+    );
+}
+
+// Wrap SidebarContent with Suspense
+export default function SidebarDemo() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-white flex items-center justify-center">
+                <Hourglass size="50" color="#312e81" />
+            </div>
+        }>
+            <SidebarContent />
+        </Suspense>
+    );
+}
