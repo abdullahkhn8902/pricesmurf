@@ -1,16 +1,15 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Hourglass } from "ldrs/react";
 import "ldrs/react/Hourglass.css";
 
-export default function CreateOrUpload() {
+// Inner component that uses useSearchParams
+function CreateOrUploadContent() {
     const router = useRouter();
-    const searchParams = useSearchParams(); // Add this line
-
+    const searchParams = useSearchParams();
     const [loading, setLoading] = useState(false);
     const [isPriceList, setIsPriceList] = useState(false);
-
 
     useEffect(() => {
         setIsPriceList(
@@ -19,13 +18,11 @@ export default function CreateOrUpload() {
         );
     }, [searchParams]);
 
-
     const handleNavigation = (path) => {
         setLoading(true);
         const newPath = isPriceList ? `${path}?purpose=price-list` : path;
         setTimeout(() => router.push(newPath), 500);
     };
-
 
     return (
         <div className="min-h-screen bg-white text-indigo-900 flex flex-col items-center justify-center px-4">
@@ -60,7 +57,31 @@ export default function CreateOrUpload() {
                 </button>
             </div>
 
-
+            {loading && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <Hourglass
+                        size="50"
+                        bg-opacity="0.1"
+                        color="white"
+                    />
+                </div>
+            )}
         </div>
+    );
+}
+
+// Outer component with Suspense boundary
+export default function CreateOrUpload() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-white flex items-center justify-center">
+                <Hourglass
+                    size="50"
+                    color="#312e81"
+                />
+            </div>
+        }>
+            <CreateOrUploadContent />
+        </Suspense>
     );
 }
