@@ -1,20 +1,18 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function ManualGenerateTable() {
+function ManualGenerateTableWithParams() {
+    const searchParams = useSearchParams();
+    const isPriceList = searchParams.get('purpose') === 'price-list';
+    return <ManualGenerateTableContent isPriceList={isPriceList} />;
+}
+
+function ManualGenerateTableContent({ isPriceList }) {
     const [columns, setColumns] = useState([""]);
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [isPriceList, setIsPriceList] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState("Saving...");
-
-    const searchParams = useSearchParams();
-
-    useEffect(() => {
-        setIsPriceList(searchParams.get('purpose') === 'price-list');
-    }, []);
-
     const router = useRouter();
 
     const addColumn = () => setColumns([...columns, ""]);
@@ -231,5 +229,13 @@ export default function ManualGenerateTable() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function ManualGenerateTable() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center">Loading table builder...</div>}>
+            <ManualGenerateTableWithParams />
+        </Suspense>
     );
 }

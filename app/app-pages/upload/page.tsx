@@ -2,9 +2,7 @@
 import { FileUpload } from "@/component-app/ui/file-upload";
 import { FaLock } from "react-icons/fa";
 import { useRouter, useSearchParams } from "next/navigation";
-
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { Hourglass } from "ldrs/react";
 import "ldrs/react/Hourglass.css";
 import {
@@ -29,14 +27,22 @@ interface SessionMetadata {
 function generateSessionId() {
     return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
 }
-// Helper function to get error message from unknown type
+
 function getErrorMessage(error: unknown): string {
     if (error instanceof Error) return error.message;
     if (typeof error === "string") return error;
     return "An unknown error occurred";
 }
-export default function FileUploadDemo() {
+
+// Component that uses useSearchParams
+function FileUploadDemoWithParams() {
     const searchParams = useSearchParams();
+    const isPriceList = searchParams.get('purpose') === 'price-list';
+    return <FileUploadDemoContent isPriceList={isPriceList} />;
+}
+
+// Main component content
+function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
     const [files, setFiles] = useState<File[]>([]);
     const [uploadStatus, setUploadStatus] = useState<UploadStatus | null>(null);
     const [loading, setLoading] = useState(false);
@@ -44,19 +50,13 @@ export default function FileUploadDemo() {
     const [customPromptEnabled, setCustomPromptEnabled] = useState(false);
     const [customPrompt, setCustomPrompt] = useState("");
     const [selectedJoin, setSelectedJoin] = useState("");
-    const [sessionId, setSessionId] = useState(""); // Store session ID
-    const router = useRouter(); // Add router
-    const [isProcessing, setIsProcessing] = useState(false); // New state for processing
+    const [sessionId, setSessionId] = useState("");
+    const router = useRouter();
+    const [isProcessing, setIsProcessing] = useState(false);
     const [metadataSaved, setMetadataSaved] = useState(false);
     const [createNewTable, setCreateNewTable] = useState(false);
     const [isReadOnly, setIsReadOnly] = useState(false);
     const [uploadedFileIds, setUploadedFileIds] = useState<string[]>([]);
-    const [isPriceList, setIsPriceList] = useState(false);
-
-    useEffect(() => {
-        setIsPriceList(searchParams.get('purpose') === 'price-list');
-    }, [searchParams]);
-
 
     const handleFilesChange = (newFiles: File[]) => {
         setFiles((prev) => [
@@ -78,12 +78,10 @@ export default function FileUploadDemo() {
         setUploadStatus(null);
 
         const newSessionId = generateSessionId();
-        setSessionId(newSessionId); // Store session ID in state
+        setSessionId(newSessionId);
 
         const uploadedIds: string[] = [];
-
         const statusList: UploadStatus[] = [];
-        const uploadedFileIds: string[] = [];
 
         for (const file of files) {
             const formData = new FormData();
@@ -91,9 +89,6 @@ export default function FileUploadDemo() {
             formData.append("sessionId", newSessionId);
             formData.append("isReadOnly", isReadOnly.toString());
             formData.append("isPriceList", isPriceList.toString());
-
-
-
 
             try {
                 const res = await fetch("/api/upload", {
@@ -108,7 +103,6 @@ export default function FileUploadDemo() {
                 } else {
                     statusList.push({ success: false, message: json.error });
                 }
-
             } catch {
                 statusList.push({
                     success: false,
@@ -137,7 +131,6 @@ export default function FileUploadDemo() {
                 .join("\n"),
         });
         setLoading(false);
-
     };
 
     const handleCombineAndRedirect = async () => {
@@ -147,14 +140,14 @@ export default function FileUploadDemo() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Cookie': document.cookie  // Add this line
+                    'Cookie': document.cookie
                 },
                 body: JSON.stringify({ sessionId })
             });
 
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Failed to process files');
-            // Categorize combined file
+
             if (data.combinedFileId) {
                 try {
                     const catRes = await fetch(`/api/categorize?fileId=${data.combinedFileId}`, {
@@ -178,7 +171,6 @@ export default function FileUploadDemo() {
             );
 
             await Promise.allSettled(categorizePromises);
-
             router.push('/app-pages/dashboard');
         } catch (error) {
             console.error('Combine error:', error);
@@ -187,6 +179,7 @@ export default function FileUploadDemo() {
             setIsProcessing(false);
         }
     };
+
     const saveSessionMetadata = async () => {
         const metadata = {
             combineData,
@@ -194,7 +187,6 @@ export default function FileUploadDemo() {
             joinType: selectedJoin,
             isReadOnly,
             customPrompt: customPromptEnabled ? customPrompt : ""
-
         };
 
         try {
@@ -223,9 +215,8 @@ export default function FileUploadDemo() {
         setUploadStatus(null);
     };
 
-
     return (
-        <div className="w-full max-w-4xl mx-auto min-h-96 border border-dashed bg-white  border-indigo-900  rounded-lg m-20 mt-[10rem]">
+        <div className="w-full max-w-4xl mx-auto min-h-96 border border-dashed bg-white border-indigo-900 rounded-lg m-20 mt-[10rem]">
             {isPriceList && (
                 <div className="p-4 bg-indigo-100 text-indigo-900 text-center">
                     Creating Price List - Files will be categorized under Price Lists
@@ -233,7 +224,7 @@ export default function FileUploadDemo() {
             )}
             <FileUpload files={files} onChange={handleFilesChange} />
 
-            <div className="mt-4 flex gap-4  m-5">
+            <div className="mt-4 flex gap-4 m-5">
                 <button
                     onClick={handleUploadAll}
                     disabled={loading || files.length === 0}
@@ -264,9 +255,9 @@ export default function FileUploadDemo() {
                     </p>
 
                     {uploadStatus.success && (
-                        <div className="py-5  flex items-center justify-center  ">
+                        <div className="py-5 flex items-center justify-center">
                             <Modal>
-                                <ModalTrigger className="bg-black  text-white flex justify-center group/modal-btn">
+                                <ModalTrigger className="bg-black text-white flex justify-center group/modal-btn">
                                     <span className="px-5 group-hover/modal-btn:translate-x-40 text-center transition duration-500">
                                         Done
                                     </span>
@@ -276,14 +267,14 @@ export default function FileUploadDemo() {
                                 </ModalTrigger>
                                 <ModalBody>
                                     <ModalContent>
-                                        <h4 className="text-lg md:text-2xl text-neutral-600  font-bold text-center mb-8">
+                                        <h4 className="text-lg md:text-2xl text-neutral-600 font-bold text-center mb-8">
                                             Help us understand your {" "}
-                                            <span className="px-1 py-0.5 rounded-md bg-gray-100  border border-gray-200">
+                                            <span className="px-1 py-0.5 rounded-md bg-gray-100 border border-gray-200">
                                                 requirement
                                             </span>{" "}
                                             more! 📊
                                         </h4>
-                                        <div className="mt-4 flex items-center  gap-2">
+                                        <div className="mt-4 flex items-center gap-2">
                                             <input
                                                 type="checkbox"
                                                 id="combine"
@@ -314,7 +305,7 @@ export default function FileUploadDemo() {
                                                 </div>
                                             </span>
                                         )}
-                                        <div className="mt-6 flex items-center  gap-2">
+                                        <div className="mt-6 flex items-center gap-2">
                                             <input
                                                 type="checkbox"
                                                 id="customPrompt"
@@ -360,7 +351,7 @@ export default function FileUploadDemo() {
                                                     if (e.target.checked) setCombineData(false);
                                                 }}
                                                 className="size-5 rounded border-gray-300 shadow-sm"
-                                                disabled={combineData} // Disable if combine is selected
+                                                disabled={combineData}
                                             />
                                             <label htmlFor="createNewTable" className="text-gray-700 font-medium">
                                                 Create a new table linking the files
@@ -388,7 +379,7 @@ export default function FileUploadDemo() {
                                         <button
                                             onClick={handleCombineAndRedirect}
                                             disabled={isProcessing || !metadataSaved}
-                                            className="group mt-4 mx-auto flex w-fit items-center justify-between gap-4 rounded-lg border border-indigo-900 bg-indigo-900 px-6 py-2 transition-colors  focus:ring-3 focus:outline-none disabled:opacity-50"
+                                            className="group mt-4 mx-auto flex w-fit items-center justify-between gap-4 rounded-lg border border-indigo-900 bg-indigo-900 px-6 py-2 transition-colors focus:ring-3 focus:outline-none disabled:opacity-50"
                                         >
                                             {isProcessing ? (
                                                 <span className="font-medium text-white flex items-center gap-2">
@@ -396,13 +387,12 @@ export default function FileUploadDemo() {
                                                     Processing...
                                                 </span>
                                             ) : (
-                                                <span className="font-medium text-white transition-colors ">
+                                                <span className="font-medium text-white transition-colors">
                                                     Done
                                                 </span>
                                             )}
                                         </button>
                                     </ModalFooter>
-
                                 </ModalBody>
                             </Modal>
                         </div>
@@ -410,5 +400,18 @@ export default function FileUploadDemo() {
                 </div>
             )}
         </div>
+    );
+}
+
+// Default export with Suspense boundary
+export default function FileUploadDemo() {
+    return (
+        <Suspense fallback={
+            <div className="w-full max-w-4xl mx-auto min-h-96 flex items-center justify-center">
+                <Hourglass size="40" bgOpacity="0.1" speed="1.75" color="#312e81" />
+            </div>
+        }>
+            <FileUploadDemoWithParams />
+        </Suspense>
     );
 }
