@@ -1,16 +1,22 @@
-import { MongoClient } from 'mongodb';
-import { GridFSBucket } from 'mongodb';
+import { MongoClient, GridFSBucket } from 'mongodb';
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { getAuth } from '@clerk/nextjs/server';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
     let client;
     try {
-        const { userId } = await auth();
-        if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const { userId } = getAuth(request);
+        console.log('API Upload - User ID:', userId);
+        if (!userId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
 
         const uri = process.env.MONGODB_URI;
+        const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
         if (!uri) throw new Error('MONGODB_URI missing in .env.local');
+        if (!OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY missing');
 
         client = new MongoClient(uri);
         await client.connect();
@@ -20,48 +26,51 @@ export async function POST(request) {
         const formData = await request.formData();
         const file = formData.get('file');
         const sessionId = formData.get('sessionId');
+        const isReadOnly = formData.get('isReadOnly') === 'true';
+        // ADDED: Get pricing list flag
+        const isPriceList = formData.get('isPriceList') === 'true';
 
-        if (!file) return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
-        if (!sessionId) return NextResponse.json({ error: 'Missing session ID' }, { status: 400 });
-
-        const validExtensions = /\.(xlsx|xls|csv)$/i;
-        if (!file.name.match(validExtensions)) {
+        if (!file) {
+            return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
+        }
+        if (!sessionId) {
+            return NextResponse.json({ error: 'Missing session ID' }, { status: 400 });
+        }
+        if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
             return NextResponse.json({ error: 'Only Excel/CSV files allowed' }, { status: 400 });
         }
 
         const buffer = Buffer.from(await file.arrayBuffer());
         const uploadDate = new Date();
-
         const uploadStream = bucket.openUploadStream(file.name, {
             metadata: {
                 userId,
                 uploadedAt: uploadDate,
-                sessionId
+                sessionId,
+                isReadOnly,
+                // ADDED: Store pricing list flag in metadata
+                isPriceList
             }
         });
-
         uploadStream.write(buffer);
         uploadStream.end();
 
         const fileId = await new Promise((resolve, reject) => {
-            uploadStream.on('finish', () => resolve(uploadStream.id));
+            uploadStream.on('finish', () => resolve(uploadStream.id.toString()));
             uploadStream.on('error', reject);
         });
 
-        // Count files in THIS SESSION
-        const sessionFileCount = await db.collection('excelFiles.files')
-            .countDocuments({
-                'metadata.userId': userId,
-                'metadata.sessionId': sessionId
-            });
-
-        return NextResponse.json({
-            message: 'File uploaded successfully',
-            fileId,
-            filename: file.name,
-            sessionId
-        }, { status: 200 });
-
+        return NextResponse.json(
+            {
+                message: 'File uploaded successfully',
+                fileId,
+                filename: file.name,
+                sessionId,
+                // ADDED: Return pricing list status
+                isPriceList
+            },
+            { status: 200 }
+        );
     } catch (error) {
         console.error('Upload error:', error);
         return NextResponse.json(
@@ -69,6 +78,6 @@ export async function POST(request) {
             { status: 500 }
         );
     } finally {
-        client?.close();
+        await client?.close();
     }
 }

@@ -1,32 +1,38 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
-const isDashboardRoute = createRouteMatcher(['/dashboard(.*)', '/upload(.*)']);
+const isDashboardRoute = createRouteMatcher([
+    '/dashboard(.*)',
+    '/upload(.*)',
+    '/createOrUpload(.*)'
+]);
 
 export default clerkMiddleware(
-    async (auth, req) => {
 
-        // Allow access to public assets
-        if (req.nextUrl.pathname.startsWith('/_next/') ||
-            req.nextUrl.pathname.startsWith('/favicon.ico') ||
-            req.nextUrl.pathname.startsWith('/api/')) {
+    async (auth, req) => {
+        if (
+            req.nextUrl.pathname.startsWith('/_next/') ||
+            req.nextUrl.pathname.startsWith('/favicon.ico')
+        ) {
             return;
         }
 
         if (isDashboardRoute(req)) {
-            // FIX: Use auth() instead of auth
             await auth.protect();
         }
+        if (req.nextUrl.pathname.startsWith('/api')) {
+            return;
+        }
     },
-    { // FIX: Move debug option outside async function
-        debug: process.env.NODE_ENV !== 'production'
+    {
+
+        debug: process.env.NODE_ENV !== 'production',
     }
+
 );
 
 export const config = {
     matcher: [
-        // Skip internal paths and static files
         '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|css|js)$).*)',
-        // Always run for API routes
         '/(api|trpc)(.*)',
     ],
 };

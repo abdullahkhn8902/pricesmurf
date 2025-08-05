@@ -1,8 +1,15 @@
 "use client";
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Sidebar, SidebarBody, SidebarLink } from "@/component-app/ui/sidebar";
 import {
     IconBrandTabler,
+    IconFolder,
+    IconBuilding,
+    IconSettings,
+    IconHistory,
+    IconFile,
+    IconPlus,
+    IconCurrencyDollar
 } from "@tabler/icons-react";
 import {
     SignedIn,
@@ -14,35 +21,174 @@ import { Hourglass } from "ldrs/react";
 import "ldrs/react/Hourglass.css";
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
-// import { Logo } from '../../component-app/Logo';
-
-
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 
 export default function SidebarDemo() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const pathname = usePathname();
     const [isClient, setIsClient] = useState(false)
+    const [open, setOpen] = useState(false);
     const { user, isLoaded } = useUser();
-    useEffect(() => {
-        setIsClient(true)
-    }, [])
+    const [sidebarData, setSidebarData] = useState([]);
+    const [expandedCategories, setExpandedCategories] = useState({
+        'Company Tables': false,
+        'Parameters': false,
+        'Transactions': false,
+        'Other Tables': false,
+        'Price Lists': false  // Add Price Lists category
+    });
+    const [loading, setLoading] = useState(true);
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [lastFetchTime, setLastFetchTime] = useState(0);
+    const initialLoadRef = useRef(true);
 
+    useEffect(() => {
+        setIsClient(true);
+
+        // Fetch data only on initial load or when sidebar opens
+        if (initialLoadRef.current || open) {
+            fetchSidebarData();
+            initialLoadRef.current = false;
+        }
+
+        if (!open) {
+            setExpandedCategories({
+                'Company Tables': false,
+                'Parameters': false,
+                'Transactions': false,
+                'Other Tables': false,
+                'Price Lists': false
+            });
+        }
+
+        // Initialize selected file from URL
+        const fileId = searchParams.get('file');
+        if (fileId) setSelectedFile(fileId);
+    }, [open]); const fetchSidebarData = async () => {
+        try {
+            const res = await fetch('/api/files?metadata=1');
+            if (!res.ok) throw new Error('Failed to fetch files');
+            const files = await res.json();
+
+            // Organize files into categories
+            const organizedData = {
+                'Company Tables': {
+                    icon: <IconBuilding className="h-5 w-5 shrink-0 text-white" />,
+                    subcategories: {
+                        'Products': { files: [] },
+                        'Customers': { files: [] },
+                        // 'Extra Product Info': { files: [] },
+                        // 'Extra Customer Info': { files: [] }
+                    }
+                },
+                'Parameters': {
+                    icon: <IconSettings className="h-5 w-5 shrink-0 text-white" />,
+                    subcategories: {
+                        'Pricing Parameters': { files: [] },
+                        'Tax Rates': { files: [] },
+                        'Other Parameters': { files: [] }
+                    }
+                },
+                'Transactions': {
+                    icon: <IconHistory className="h-5 w-5 shrink-0 text-white" />,
+                    subcategories: {
+                        'Historical Transactions': { files: [] },
+                        'Other Transactions': { files: [] }
+                    }
+                },
+                'Other Tables': {
+                    icon: <IconFolder className="h-5 w-5 shrink-0 text-white" />,
+                    subcategories: {
+                        'Uncategorized': { files: [] }
+                    }
+                },
+                // Add Price Lists category with no predefined subcategories
+                'Price Lists': {
+                    icon: <IconCurrencyDollar className="h-5 w-5 shrink-0 text-white" />,
+                    files: []
+                }
+            };
+
+            // Categorize files
+            files.forEach(file => {
+                const category = file.category || 'Other Tables';
+                const subcategory = file.subcategory || 'Uncategorized';
+                if (file.category === 'Price Lists') {
+                    // Add directly to Price Lists category
+                    organizedData['Price Lists'].files.push({
+                        id: file.id,
+                        filename: file.filename,
+                        readOnly: file.readOnly || false
+                    });
+                } else {
+
+                    if (organizedData[category] && organizedData[category].subcategories[subcategory]) {
+                        organizedData[category].subcategories[subcategory].files.push({
+                            id: file.id,
+                            filename: file.filename,
+                            readOnly: file.readOnly || false
+                        });
+                    } else {
+                        // Create new subcategory if it doesn't exist
+                        if (!organizedData[category]) {
+                            organizedData[category] = {
+                                icon: <IconFolder className="h-5 w-5 shrink-0 text-white" />,
+                                subcategories: {}
+                            };
+                        }
+                        if (!organizedData[category].subcategories[subcategory]) {
+                            organizedData[category].subcategories[subcategory] = { files: [] };
+                        }
+                        organizedData[category].subcategories[subcategory].files.push({
+                            id: file.id,
+                            filename: file.filename,
+                            readOnly: file.readOnly || false
+                        });
+                    }
+                }
+            });
+
+            setSidebarData(organizedData);
+        } catch (err) {
+            console.error('Error fetching sidebar data:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const toggleCategory = (category) => {
+        setExpandedCategories(prev => ({
+            ...prev,
+            [category]: !prev[category]
+        }));
+    };
+
+    const handleFileSelect = (fileId, category, subcategory) => {
+        setSelectedFile(fileId);
+        const params = new URLSearchParams(searchParams);
+        params.set('file', fileId);
+        params.set('category', category);
+        params.set('subcategory', subcategory);
+        router.replace(`${pathname}?${params.toString()}`);
+    };
+
+    const handleCreatePriceList = () => {
+        router.push('/app-pages/createOrUpload?purpose=price-list');
+    };
 
     const links = [
         {
             label: "Dashboard",
             href: "/app-pages/dashboard",
-            icon: (
-                <IconBrandTabler className="h-5 w-5 shrink-0 text-white " />
-            ),
+            icon: <IconBrandTabler className="h-5 w-5 shrink-0 text-white" />,
         },
         {
             label: "Upload a file",
             href: "/app-pages/upload",
-            icon: (
-                <FaFileExcel className="h-5 w-5 shrink-0 text-white " />
-            ),
+            icon: <FaFileExcel className="h-5 w-5 shrink-0 text-white" />,
         }
     ];
-    const [open, setOpen] = useState(false);
 
     return (
         <div
@@ -54,11 +200,123 @@ export default function SidebarDemo() {
             <Sidebar open={open} setOpen={setOpen}>
                 <SidebarBody className="justify-between gap-10">
                     <div className="flex flex-1 flex-col overflow-x-hidden overflow-y-auto ">
-                        {/* {open ? <Logo isIcon={false} /> : <Logo isIcon={true} />} */}
                         <div className="mt-8 flex flex-col gap-2 ">
                             {links.map((link, idx) => (
                                 <SidebarLink key={idx} link={link} />
                             ))}
+
+                            {/* New Sidebar Structure */}
+                            {loading ? (
+                                <div className="flex justify-center py-4">
+                                    <Hourglass size="20" bgOpacity="0.1" speed="1.75" color="white" />
+                                </div>
+                            ) : (
+                                Object.entries(sidebarData).map(([category, categoryData]) => (
+                                    <div key={category} className="flex flex-col">
+                                        <button
+                                            className="flex items-center gap-2 py-2 text-white hover:bg-neutral-700 rounded"
+                                            onClick={() => toggleCategory(category)}
+                                        >
+                                            {categoryData.icon}
+                                            <motion.span
+                                                animate={{
+                                                    display: open ? "inline-block" : "none",
+                                                    opacity: open ? 1 : 0,
+                                                }}
+                                                className="text-white text-sm"
+                                            >
+                                                {category}
+                                            </motion.span>
+                                            <motion.span
+                                                className="ml-auto"
+                                                animate={{
+                                                    display: open ? "inline-block" : "none",
+                                                    opacity: open ? 1 : 0,
+                                                }}
+                                            >
+                                                {expandedCategories[category] ? '▼' : '►'}
+                                            </motion.span>
+                                        </button>
+
+                                        {expandedCategories[category] && (
+                                            <div className="pl-6">
+                                                {category === 'Price Lists' && (
+                                                    <button
+                                                        onClick={handleCreatePriceList}
+                                                        className="flex items-center gap-1 text-xs text-white mb-2"
+                                                    >
+                                                        <IconPlus size={12} /> Create Price List
+                                                    </button>
+                                                )}
+                                                {category === 'Price Lists' ? (
+                                                    categoryData.files.map(file => (
+                                                        <button
+                                                            key={file.id}
+                                                            onClick={() => handleFileSelect(file.id, category, '')}
+                                                            className={cn(
+                                                                "block py-1 text-white text-xs truncate hover:underline w-full text-left",
+                                                                selectedFile === file.id && "bg-blue-500 rounded px-2"
+                                                            )}
+                                                            title={file.filename}
+                                                        >
+                                                            <motion.span
+                                                                animate={{
+                                                                    display: open ? "inline-block" : "none",
+                                                                    opacity: open ? 1 : 0,
+                                                                }}
+                                                            >
+                                                                {file.filename}
+                                                                {file.readOnly && " (RO)"}
+                                                            </motion.span>
+                                                        </button>
+                                                    ))
+                                                ) : (
+
+                                                    Object.entries(categoryData.subcategories).map(([subcategory, subData]) => (
+                                                        <div key={subcategory} className="mt-1">
+                                                            <div className="flex items-center py-1 text-white">
+                                                                <IconFile className="h-4 w-4 mr-2" />
+                                                                <motion.span
+                                                                    animate={{
+                                                                        display: open ? "inline-block" : "none",
+                                                                        opacity: open ? 1 : 0,
+                                                                    }}
+                                                                    className="text-xs"
+                                                                >
+                                                                    {subcategory}
+                                                                </motion.span>
+                                                            </div>
+                                                            <div className="pl-6">
+                                                                {subData.files.map(file => (
+                                                                    <button
+                                                                        key={file.id}
+                                                                        onClick={() => handleFileSelect(file.id, category, subcategory)}
+                                                                        className={cn(
+                                                                            "block py-1 text-white text-xs truncate hover:underline w-full text-left",
+                                                                            selectedFile === file.id && "bg-blue-500 rounded px-2"
+                                                                        )}
+                                                                        title={file.filename}
+                                                                    >
+                                                                        <motion.span
+                                                                            animate={{
+                                                                                display: open ? "inline-block" : "none",
+                                                                                opacity: open ? 1 : 0,
+                                                                            }}
+                                                                        >
+                                                                            {file.filename}
+                                                                            {file.readOnly && " (RO)"}
+                                                                        </motion.span>
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))
+                            )}
                             <div className="flex items-center gap-2  py-2 cursor-pointer text-white hover:bg-neutral-700 rounded">
                                 <SignedIn>
                                     <UserButton
@@ -76,14 +334,17 @@ export default function SidebarDemo() {
                     </div>
                 </SidebarBody>
             </Sidebar>
-            <Dashboard />
+            <Dashboard selectedFileId={selectedFile} />
         </div>
     );
 }
 
 
+const Dashboard = ({ selectedFileId: propSelectedFileId }) => {
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
 
-const Dashboard = () => {
     const [isClient, setIsClient] = useState(false);
     const [files, setFiles] = useState([]);
     const [selectedFileId, setSelectedFileId] = useState('');
@@ -99,17 +360,19 @@ const Dashboard = () => {
     const [analysisError, setAnalysisError] = useState('');
     const [customPrompt, setCustomPrompt] = useState('');
     const [showCustomPromptModal, setShowCustomPromptModal] = useState(false);
-
+    const [showTransformModal, setShowTransformModal] = useState(false);
+    const [transformPrompt, setTransformPrompt] = useState('');
+    const [showAddColumnModal, setShowAddColumnModal] = useState(false);
+    const [newColumnName, setNewColumnName] = useState('');
+    const [columnToRemove, setColumnToRemove] = useState(null);
+    const [isReadOnly, setIsReadOnly] = useState(false);
 
     const sanitizeColumnName = (name) => {
         return (name || '').toString().replace(/[^a-zA-Z0-9\s_-]/g, '').trim() || 'Unnamed';
     };
 
-
     useEffect(() => {
         setIsClient(true);
-        // Fetch list of files
-        setIsLoading(true);
         fetch('/api/files')
             .then(res => {
                 if (!res.ok) throw new Error('Failed to fetch files');
@@ -117,8 +380,14 @@ const Dashboard = () => {
             })
             .then(files => {
                 setFiles(files);
-                if (files.length > 0) {
+                // Use prop if available, otherwise default to first file
+                if (propSelectedFileId && files.some(f => f.id === propSelectedFileId)) {
+                    setSelectedFileId(propSelectedFileId);
+                    const selectedFile = files.find(f => f.id === propSelectedFileId);
+                    setIsReadOnly(selectedFile?.readOnly || false);
+                } else if (files.length > 0) {
                     setSelectedFileId(files[0].id);
+                    setIsReadOnly(files[0]?.readOnly || false);
                 }
                 setError('');
             })
@@ -127,7 +396,7 @@ const Dashboard = () => {
                 console.error('Error fetching files:', err);
             })
             .finally(() => setIsLoading(false));
-    }, []);
+    }, [propSelectedFileId]); // Add prop to dependency array
 
     useEffect(() => {
         const fetchFileData = async () => {
@@ -137,12 +406,14 @@ const Dashboard = () => {
             try {
                 const res = await fetch(`/api/files?id=${selectedFileId}`);
                 if (!res.ok) throw new Error('Failed to fetch file data');
-                const { sheetName, columns, data, analysis } = await res.json();
+                const { sheetName, columns, data, analysis, isReadOnly: roFlag } = await res.json();
 
                 setSheetName(sheetName || 'Sheets');
                 setColumns((columns || []).map(sanitizeColumnName));
                 setData(data || []);
                 setAnalysis(analysis || '');
+                setIsReadOnly(roFlag);
+
                 setError('');
             } catch (err) {
                 setError('Error fetching file data. Please try again.');
@@ -155,10 +426,28 @@ const Dashboard = () => {
         fetchFileData();
     }, [selectedFileId]);
 
+    useEffect(() => {
+        // Update URL when selectedFileId changes
+        if (selectedFileId) {
+            const params = new URLSearchParams(searchParams);
+            params.set('file', selectedFileId);
+            router.replace(`${pathname}?${params.toString()}`);
+        }
+    }, [selectedFileId, pathname, router, searchParams]);
+
+    useEffect(() => {
+        if (selectedFileId && files.length > 0) {
+            const selectedFile = files.find(file => file.id === selectedFileId);
+            setIsReadOnly(selectedFile?.readOnly || false);
+        }
+    }, [selectedFileId, files]);
+
+
     const handleEdit = (index) => {
         setEditingIndex(index);
         setEditData(data[index]);
     };
+
     const handleAnalyze = async (customPrompt = '') => {
         if (!selectedFileId) {
             setAnalysisError('No file selected');
@@ -178,7 +467,6 @@ const Dashboard = () => {
             if (!response.ok) throw new Error(result.error || 'Analysis failed');
 
             setAnalysis(result.analysis);
-            fetchFiles(); // Refresh analysis data
         } catch (err) {
             setAnalysisError(err.message);
         } finally {
@@ -210,7 +498,10 @@ const Dashboard = () => {
             setError('No file selected');
             return;
         }
-
+        if (isReadOnly) {
+            setError('Cannot save changes to a read-only file');
+            return;
+        }
         setIsLoading(true);
         try {
             const response = await fetch(`/api/update?id=${selectedFileId}`, {
@@ -235,9 +526,6 @@ const Dashboard = () => {
         }
     };
 
-
-
-
     const handleRemove = (index) => {
         const updatedData = data.filter((_, i) => i !== index);
         setData(updatedData);
@@ -248,11 +536,94 @@ const Dashboard = () => {
         setEditData((prevData) => ({ ...prevData, [name]: value }));
     };
 
+    const handleTransformData = async () => {
+        if (!selectedFileId) {
+            setAnalysisError('No file selected');
+            return;
+        }
+
+        setIsAnalysisLoading(true);
+        setAnalysisError('');
+
+        try {
+            const response = await fetch(`/api/transform?fileId=${selectedFileId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: transformPrompt }),
+            });
+
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Transformation failed');
+
+            // Update local state with transformed data
+            setColumns(result.columns);
+            setData(result.data);
+
+            setAnalysis('Data transformation completed successfully!');
+            setShowTransformModal(false);
+        } catch (err) {
+            setAnalysisError(err.message);
+        } finally {
+            setIsAnalysisLoading(false);
+        }
+    };
+
+    const handleAddColumn = () => {
+        if (!newColumnName.trim()) {
+            setError('Column name cannot be empty');
+            return;
+        }
+
+        const sanitized = sanitizeColumnName(newColumnName);
+        if (columns.includes(sanitized)) {
+            setError(`Column "${sanitized}" already exists`);
+            return;
+        }
+
+        // Add new column to all rows
+        const newData = data.map(row => ({
+            ...row,
+            [sanitized]: ''
+        }));
+
+        setColumns([...columns, sanitized]);
+        setData(newData);
+        setShowAddColumnModal(false);
+        setNewColumnName('');
+        setError('');
+    };
+
+    const handleRemoveColumn = (columnName) => {
+        if (columns.length <= 1) {
+            setError('Cannot remove the last column');
+            return;
+        }
+
+        // Remove column from all rows
+        const newData = data.map(row => {
+            const newRow = { ...row };
+            delete newRow[columnName];
+            return newRow;
+        });
+
+        setColumns(columns.filter(col => col !== columnName));
+        setData(newData);
+        setColumnToRemove(null);
+    };
+
     return (
         <div className="flex flex-1">
             <div className="flex w-full flex-1 flex-col gap-2 rounded-tl-2xl border border-neutral-200 bg-gray-200 p-2 md:p-10 ">
                 <div className="flex justify-between items-center mt-2 px-4">
-                    <div className="text-xl font-bold text-center w-full dark:text-indigo-900">{sheetName}</div>
+                    <div className="text-xl font-bold text-center w-full dark:text-indigo-900">{sheetName}
+                        {isReadOnly && (
+                            <span className="px-2 py-2 bg-yellow-500 text-white text-xs rounded-md ml-10">
+                                Read-Only
+                            </span>
+                        )}
+                    </div>
+
+
                     <div className="flex gap-2">
                         <button
                             onClick={handleCustomAnalyze}
@@ -262,14 +633,23 @@ const Dashboard = () => {
                         </button>
 
                         <button
+                            onClick={() => setShowTransformModal(true)}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        >
+                            Create Changes in Data through AI
+                        </button>
+
+                        <button
                             onClick={handleSaveChanges}
-                            disabled={isLoading}
+                            disabled={isLoading || isReadOnly}
                             className="px-4 py-2 bg-green-600 text-white rounded-lg disabled:opacity-50"
                         >
                             Save Changes
                         </button>
                     </div>
                 </div>
+
+                {/* Custom Analyze Modal */}
                 {showCustomPromptModal && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                         <div className="bg-white p-6 rounded-lg w-full max-w-2xl">
@@ -299,10 +679,102 @@ const Dashboard = () => {
                     </div>
                 )}
 
-                {/* Add Analysis Display Section */}
+                {/* Transform Data Modal */}
+                {showTransformModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-white p-6 rounded-lg w-full max-w-2xl">
+                            <h3 className="text-lg font-semibold mb-4 dark:text-black">
+                                Transform Data with AI
+                            </h3>
+                            <textarea
+                                value={transformPrompt}
+                                onChange={(e) => setTransformPrompt(e.target.value)}
+                                placeholder="Enter instructions to transform the data (e.g., 'Create a new table linking each product to every customer')..."
+                                className="w-full h-40 p-3 border rounded-lg mb-4 dark:border-black dark:text-black"
+                            />
+                            <div className="flex justify-end gap-2">
+                                <button
+                                    onClick={() => setShowTransformModal(false)}
+                                    className="px-4 py-2 bg-gray-300 rounded-lg dark:text-black"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleTransformData}
+                                    disabled={isAnalysisLoading}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50"
+                                >
+                                    {isAnalysisLoading ? 'Transforming...' : 'Transform Data'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Add Column Modal */}
+                {showAddColumnModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-white p-6 rounded-lg w-full max-w-md">
+                            <h3 className="text-lg font-semibold mb-4 dark:text-black">Add New Column</h3>
+                            <input
+                                value={newColumnName}
+                                onChange={(e) => setNewColumnName(e.target.value)}
+                                placeholder="Enter column name"
+                                className="w-full p-3 border rounded-lg mb-4 dark:border-black dark:text-black"
+                            />
+                            {error && <div className="text-red-500 mb-2">{error}</div>}
+                            <div className="flex justify-end gap-2">
+                                <button
+                                    onClick={() => setShowAddColumnModal(false)}
+                                    className="px-4 py-2 bg-gray-300 rounded-lg dark:text-black"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleAddColumn}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+                                >
+                                    Add Column
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Remove Column Confirmation Modal */}
+                {columnToRemove && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-white p-6 rounded-lg w-full max-w-md">
+                            <h3 className="text-lg font-semibold mb-4 dark:text-black">
+                                Confirm Column Removal
+                            </h3>
+                            <p className="mb-4">
+                                Are you sure you want to remove the column: <strong>{columnToRemove}</strong>?
+                                This action cannot be undone.
+                            </p>
+                            {error && <div className="text-red-500 mb-2">{error}</div>}
+                            <div className="flex justify-end gap-2">
+                                <button
+                                    onClick={() => setColumnToRemove(null)}
+                                    className="px-4 py-2 bg-gray-300 rounded-lg dark:text-black"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => handleRemoveColumn(columnToRemove)}
+                                    className="px-4 py-2 bg-red-600 text-white rounded-lg"
+                                >
+                                    Remove Column
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Analysis Display */}
                 {analysis && (
-                    <div className="mt-4 p-4 bg-white rounded-lg shadow-md">
-                        <h3 className="text-lg font-semibold mb-2">AI Analysis</h3>
+                    <div className="mt-4 max-h-[40vh] overflow-y-auto bg-white p-4 rounded-lg shadow-md relative z-10">
+                        <h3 className="text-lg font-semibold mb-2 text-indigo-900">PriceSmurf AI</h3>
                         <div className="whitespace-pre-line text-gray-700">
                             {analysis}
                         </div>
@@ -319,14 +791,22 @@ const Dashboard = () => {
                     <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-indigo-900">Select File</label>
                         <select
-                            value={selectedFileId}
-                            onChange={(e) => setSelectedFileId(e.target.value)}
+                            value={selectedFileId || ''}
+                            onChange={(e) => {
+                                setSelectedFileId(e.target.value);
+                                const selectedFile = files.find(f => f.id === e.target.value);
+                                setIsReadOnly(selectedFile?.readOnly || false);
+                            }}
                             className="w-full border rounded-lg p-2 dark:bg-indigo-900"
                             disabled={isLoading}
                         >
                             <option value="">Select a file</option>
                             {files.map(file => (
-                                <option key={file.id} value={file.id}>{file.filename}</option>
+                                <option key={file.id} value={file.id}>
+                                    {file.filename}
+                                    {file.readOnly && " (Read-Only)"}
+                                    {file.category && ` [${file.category} > ${file.subcategory}]`}
+                                </option>
                             ))}
                         </select>
                     </div>
@@ -337,14 +817,34 @@ const Dashboard = () => {
                     )}
                     {error && <div className="text-center text-red-600 mb-4">{error}</div>}
                     {!isLoading && !error && (
-                        <div className="relative overflow-auto shadow-md sm:rounded-lg max-h-[80vh]">
+                        <div className="relative overflow-x-auto shadow-md sm:rounded-lg block max-h-[70vh] overflow-y-auto">
                             <table className="min-w-full text-sm text-left text-gray-500 ">
-                                <thead className="text-xs text-gray-700 uppercase bg-gray-50 ">
+                                <thead className="sticky top-0 text-xs text-gray-700 uppercase bg-gray-50 z-10">
                                     <tr>
                                         {columns.map((header) => (
-                                            <th key={header} className="px-6 py-3">{header}</th>
+                                            <th key={header} className="px-6 py-3 group relative">
+                                                {header}
+                                                {!isReadOnly && (
+                                                    <button
+                                                        onClick={() => setColumnToRemove(header)}
+                                                        className="absolute right-1 top-1/2 transform -translate-y-1/2 text-white opacity-0 group-hover:opacity-100 p-2 bg-red-200 rounded-full "
+                                                        title={`Remove ${header} column`}
+                                                    >
+                                                        ❌
+                                                    </button>
+                                                )}
+                                            </th>
                                         ))}
-                                        <th className="px-6 py-3">Action</th>
+                                        <th className="px-6 py-3 flex items-center gap-2">
+                                            <span>Action</span>
+                                            <button
+                                                onClick={() => setShowAddColumnModal(true)}
+                                                className="text-white hover:text-green-200 bg-indigo-200 p-2 rounded-full"
+                                                title="Add new column"
+                                            >
+                                                ➕
+                                            </button>
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -354,9 +854,12 @@ const Dashboard = () => {
                                                 <td key={col} className="px-6 py-4">{row[col] || ''}</td>
                                             ))}
                                             <td className="px-6 py-4 space-x-3">
-                                                <button onClick={() => handleEdit(index)} className="font-medium text-blue-600  hover:underline">Edit</button>
-                                                <button onClick={() => handleRemove(index)} className="font-medium text-red-600  hover:underline">Remove</button>
-                                            </td>
+                                                {!isReadOnly && (
+                                                    <>
+                                                        <button onClick={() => handleEdit(index)} className="font-medium text-blue-600  hover:underline">Edit</button>
+                                                        <button onClick={() => handleRemove(index)} className="font-medium text-red-600  hover:underline">Remove</button>
+                                                    </>
+                                                )}                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -364,7 +867,7 @@ const Dashboard = () => {
                         </div>
                     )}
                 </div>
-                {editingIndex !== null && (
+                {editingIndex !== null && !isReadOnly && (
                     <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 overflow-y-auto ">
                         <div className="bg-white p-5 rounded-lg shadow-lg w-full max-w-md overflow-y-auto">
                             <h3 className="text-lg font-semibold mb-4 dark:text-black">Edit Details</h3>

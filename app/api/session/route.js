@@ -16,10 +16,16 @@ export async function POST(request) {
         await client.connect();
         const db = client.db('Project0');
 
-        // Store/update session metadata
+        // Store/update session metadata with read-only status
         await db.collection('sessionMetadata').updateOne(
             { sessionId },
-            { $set: { ...metadata, updatedAt: new Date() } },
+            {
+                $set: {
+                    ...metadata,
+                    updatedAt: new Date(),
+                    isReadOnly: metadata.isReadOnly || false
+                }
+            },
             { upsert: true }
         );
 

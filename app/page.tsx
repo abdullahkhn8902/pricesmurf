@@ -25,7 +25,7 @@ export default function Home() {
       setShowLoader(true);
 
       const timer = setTimeout(() => {
-        router.push("/app-pages/upload");
+        router.push("/app-pages/createOrUpload");
       }, 1500); // 1.5s delay before redirect
 
       return () => clearTimeout(timer);

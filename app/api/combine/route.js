@@ -3,6 +3,8 @@ import { GridFSBucket } from 'mongodb';
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import ExcelJS from 'exceljs';
+import { Readable } from 'stream';
+
 
 // Prevent static analysis during build
 export const dynamic = 'force-dynamic';
@@ -130,6 +132,7 @@ function parseAIResponse(response) {
 }
 
 export async function POST(request) {
+    let sessionId = null;
     const uri = process.env.MONGODB_URI;
     const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
@@ -154,7 +157,8 @@ export async function POST(request) {
         const { userId } = await auth();
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const { sessionId } = await request.json();
+        const body = await request.json();
+        sessionId = body.sessionId;
         if (!sessionId) {
             return NextResponse.json({ error: 'Session ID is required' }, { status: 400 });
         }
@@ -177,8 +181,16 @@ export async function POST(request) {
             .findOne({ sessionId });
 
         const combineData = sessionMetadata?.combineData || false;
+        const createNewTable = sessionMetadata?.createNewTable || false;
         const joinType = sessionMetadata?.joinType || "";
         const customPrompt = sessionMetadata?.customPrompt || "";
+        if (combineData && createNewTable) {
+            processingLocks.delete(sessionId);
+            return NextResponse.json(
+                { error: "Cannot both combine data and create new table" },
+                { status: 400 }
+            );
+        }
 
         // 1. Get consistent snapshot of files at request start
         const requestStartTime = new Date();
@@ -220,8 +232,15 @@ export async function POST(request) {
             });
 
             const workbook = new ExcelJS.Workbook();
+
+            // FIX: Convert buffer to stream for CSV processing
             if (file.filename.toLowerCase().endsWith('.csv')) {
-                await workbook.csv.read(buffer.toString());
+                // Create stream from buffer
+                const bufferStream = new Readable();
+                bufferStream.push(buffer);
+                bufferStream.push(null);
+
+                await workbook.csv.read(bufferStream);
             } else {
                 await workbook.xlsx.load(buffer);
             }
@@ -253,8 +272,21 @@ export async function POST(request) {
         }));
 
         // Build DeepSeek prompt
-        let prompt = `
-COMBINE THESE DATASETS INTO A SINGLE COMBINED DATASET:
+        let prompt = ``;
+
+        if (createNewTable) {
+            prompt = `CREATE A NEW TABLE LINKING THESE DATASETS:
+${datasetsText.join('\n\n')}
+
+INSTRUCTIONS:
+1. Analyze all datasets to identify linkable relationships
+2. Create a NEW table that connects records across datasets
+3. Generate appropriate foreign key relationships
+4. Add meaningful calculated fields (e.g., derived relationships)
+5. OUTPUT ONLY AS A SINGLE JSON ARRAY OF OBJECTS
+6. IMPORTANT: Return minimal JSON without explanations`;
+        } else {
+            prompt = `COMBINE THESE DATASETS INTO A SINGLE COMBINED DATASET:
 ${datasetsText.join('\n\n')}
 
 INSTRUCTIONS:
@@ -272,14 +304,17 @@ COLUMN STANDARDIZATION PRINCIPLES:
 - Normalize date formats
 - Handle synonymous terms
 - Correct common misspellings
-- Remove special characters and spaces
-`.trim();
-        if (joinType) {
-            prompt += `\n\nJOIN REQUIREMENT: Use ${joinType}`;
+- Remove special characters and spaces`;
         }
 
+        // Prioritize user prompt regardless of mode
         if (customPrompt) {
-            prompt += `\n\nUSER SPECIFIC REQUIREMENT: ${customPrompt}`;
+            prompt = `USER PRIORITY INSTRUCTION: ${customPrompt}\n\n${prompt}`;
+        }
+
+        // Add join type only for combine mode
+        if (joinType && !createNewTable) {
+            prompt += `\n\nJOIN REQUIREMENT: Use ${joinType}`;
         }
 
         console.log('Sending request to OpenRouter API...');
@@ -415,8 +450,10 @@ COLUMN STANDARDIZATION PRINCIPLES:
             newSheet.addRow(['No data combined']);
         }
 
+        // FIX: Generate Excel buffer from workbook
+        const excelBuffer = await newWorkbook.xlsx.writeBuffer();
+
         // Store in GridFS
-        const buffer = await newWorkbook.xlsx.writeBuffer();
         const uploadStream = bucket.openUploadStream(`combined-${Date.now()}.xlsx`, {
             contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             metadata: {
@@ -425,23 +462,39 @@ COLUMN STANDARDIZATION PRINCIPLES:
                 sessionId,
                 isCombined: true,
                 sourceFileIds: fileIds,
-                requestStartTime: requestStartTime
+                requestStartTime,
+                isReadOnly: sessionMetadata?.isReadOnly || false
             }
         });
 
+        // FIX: Use the generated Excel buffer
         await new Promise((resolve, reject) => {
-            uploadStream.write(buffer);
-            uploadStream.end(resolve);
-            uploadStream.on('error', reject);
+            // Create stream directly from buffer
+            const bufferStream = new Readable();
+            bufferStream.push(excelBuffer);
+            bufferStream.push(null);
+
+            bufferStream.pipe(uploadStream)
+                .on('finish', resolve)
+                .on('error', reject);
         });
 
         console.log(`Stored combined file with ID: ${uploadStream.id}`);
         processingLocks.delete(sessionId);
-        return NextResponse.json({ fileId: uploadStream.id }, {
+
+        try {
+            await categorizeFile(uploadStream.id.toString(), userId);
+        } catch (err) {
+            console.error('Combined file categorization error:', err);
+        }
+
+
+        // FIX: Use excelBuffer for size calculation
+        return NextResponse.json({ fileId: uploadStream.id, combinedFileId: uploadStream.id }, {
             status: 200,
             headers: {
                 'X-Exec-Time': `${Date.now() - startTime}ms`,
-                'X-Response-Size': `${buffer.byteLength}`
+                'X-Response-Size': `${excelBuffer.byteLength}`
             }
         });
 

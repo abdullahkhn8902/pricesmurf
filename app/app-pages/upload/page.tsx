@@ -1,6 +1,10 @@
 "use client";
 import { FileUpload } from "@/component-app/ui/file-upload";
-import React, { useState } from "react";
+import { FaLock } from "react-icons/fa";
+import { useRouter, useSearchParams } from "next/navigation";
+
+
+import React, { useState, useEffect } from "react";
 import { Hourglass } from "ldrs/react";
 import "ldrs/react/Hourglass.css";
 import {
@@ -10,7 +14,6 @@ import {
     ModalFooter,
     ModalTrigger,
 } from "@/component-app/ui/animated-modal";
-import { useRouter } from "next/navigation";
 
 interface UploadStatus {
     success: boolean;
@@ -33,6 +36,7 @@ function getErrorMessage(error: unknown): string {
     return "An unknown error occurred";
 }
 export default function FileUploadDemo() {
+    const searchParams = useSearchParams();
     const [files, setFiles] = useState<File[]>([]);
     const [uploadStatus, setUploadStatus] = useState<UploadStatus | null>(null);
     const [loading, setLoading] = useState(false);
@@ -44,6 +48,15 @@ export default function FileUploadDemo() {
     const router = useRouter(); // Add router
     const [isProcessing, setIsProcessing] = useState(false); // New state for processing
     const [metadataSaved, setMetadataSaved] = useState(false);
+    const [createNewTable, setCreateNewTable] = useState(false);
+    const [isReadOnly, setIsReadOnly] = useState(false);
+    const [uploadedFileIds, setUploadedFileIds] = useState<string[]>([]);
+    const [isPriceList, setIsPriceList] = useState(false);
+
+    useEffect(() => {
+        setIsPriceList(searchParams.get('purpose') === 'price-list');
+    }, [searchParams]);
+
 
     const handleFilesChange = (newFiles: File[]) => {
         setFiles((prev) => [
@@ -67,31 +80,53 @@ export default function FileUploadDemo() {
         const newSessionId = generateSessionId();
         setSessionId(newSessionId); // Store session ID in state
 
-
+        const uploadedIds: string[] = [];
 
         const statusList: UploadStatus[] = [];
+        const uploadedFileIds: string[] = [];
+
         for (const file of files) {
             const formData = new FormData();
             formData.append("file", file);
             formData.append("sessionId", newSessionId);
+            formData.append("isReadOnly", isReadOnly.toString());
+            formData.append("isPriceList", isPriceList.toString());
+
+
+
 
             try {
                 const res = await fetch("/api/upload", {
                     method: "POST",
                     body: formData,
+                    credentials: "include"
                 });
                 const json = await res.json();
                 if (res.ok) {
                     statusList.push({ success: true, message: json.message });
+                    uploadedIds.push(json.fileId);
                 } else {
                     statusList.push({ success: false, message: json.error });
                 }
+
             } catch {
                 statusList.push({
                     success: false,
                     message: "Network error uploading " + file.name,
                 });
             }
+        }
+        setUploadedFileIds(uploadedIds);
+
+        for (const id of uploadedIds) {
+            fetch(`/api/categorize?fileId=${id}`, {
+                method: 'GET',
+                credentials: 'include',
+            })
+                .then(res => {
+                    if (!res.ok) console.error('Categorization error for', id, res.status);
+                })
+                .catch(err => console.error('Categorization failed for', id, err));
         }
 
         const anyFail = statusList.some((s) => !s.success);
@@ -102,6 +137,7 @@ export default function FileUploadDemo() {
                 .join("\n"),
         });
         setLoading(false);
+
     };
 
     const handleCombineAndRedirect = async () => {
@@ -118,6 +154,30 @@ export default function FileUploadDemo() {
 
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Failed to process files');
+            // Categorize combined file
+            if (data.combinedFileId) {
+                try {
+                    const catRes = await fetch(`/api/categorize?fileId=${data.combinedFileId}`, {
+                        method: 'GET',
+                        credentials: 'include',
+                    });
+
+                    if (!catRes.ok) {
+                        console.error('Combined file categorization failed', catRes.status);
+                    }
+                } catch (err) {
+                    console.error('Combined file categorization error', err);
+                }
+            }
+
+            const categorizePromises = uploadedFileIds.map(id =>
+                fetch(`/api/categorize?fileId=${id}`, {
+                    method: 'GET',
+                    credentials: 'include',
+                })
+            );
+
+            await Promise.allSettled(categorizePromises);
 
             router.push('/app-pages/dashboard');
         } catch (error) {
@@ -130,8 +190,11 @@ export default function FileUploadDemo() {
     const saveSessionMetadata = async () => {
         const metadata = {
             combineData,
+            createNewTable,
             joinType: selectedJoin,
+            isReadOnly,
             customPrompt: customPromptEnabled ? customPrompt : ""
+
         };
 
         try {
@@ -163,6 +226,11 @@ export default function FileUploadDemo() {
 
     return (
         <div className="w-full max-w-4xl mx-auto min-h-96 border border-dashed bg-white  border-indigo-900  rounded-lg m-20 mt-[10rem]">
+            {isPriceList && (
+                <div className="p-4 bg-indigo-100 text-indigo-900 text-center">
+                    Creating Price List - Files will be categorized under Price Lists
+                </div>
+            )}
             <FileUpload files={files} onChange={handleFilesChange} />
 
             <div className="mt-4 flex gap-4  m-5">
@@ -269,6 +337,36 @@ export default function FileUploadDemo() {
                                                 />
                                             </div>
                                         )}
+                                        <div className="mt-4 flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                id="readOnly"
+                                                checked={isReadOnly}
+                                                onChange={(e) => setIsReadOnly(e.target.checked)}
+                                                className="size-5 rounded border-gray-300 shadow-sm"
+                                            />
+                                            <label htmlFor="readOnly" className="text-gray-700 font-medium flex items-center gap-2">
+                                                Mark as Read-Only <FaLock className="text-red-500" />
+                                            </label>
+                                        </div>
+
+                                        <div className="mt-4 flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                id="createNewTable"
+                                                checked={createNewTable}
+                                                onChange={(e) => {
+                                                    setCreateNewTable(e.target.checked);
+                                                    if (e.target.checked) setCombineData(false);
+                                                }}
+                                                className="size-5 rounded border-gray-300 shadow-sm"
+                                                disabled={combineData} // Disable if combine is selected
+                                            />
+                                            <label htmlFor="createNewTable" className="text-gray-700 font-medium">
+                                                Create a new table linking the files
+                                            </label>
+                                        </div>
+
                                     </ModalContent>
                                     <ModalFooter className="gap-4">
                                         <button
