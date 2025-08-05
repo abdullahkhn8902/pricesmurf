@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { Sidebar, SidebarBody, SidebarLink } from "@/component-app/ui/sidebar";
+import Modal from "@/component-app/ui/Modal";
 import {
     IconBrandTabler,
     IconFolder,
@@ -16,7 +17,10 @@ import {
     UserButton,
     useUser
 } from '@clerk/nextjs';
-import { FaFileExcel } from "react-icons/fa";
+import { FaExchangeAlt } from "react-icons/fa";
+import { FaFileUpload } from "react-icons/fa";
+import { FaChartLine } from "react-icons/fa";
+import { FaBuilding } from "react-icons/fa6";
 import { Hourglass } from "ldrs/react";
 import "ldrs/react/Hourglass.css";
 import { motion } from "motion/react";
@@ -27,6 +31,9 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 
 // Create inner component for Sidebar that uses useSearchParams
 function SidebarContent() {
+    const [newSubcategoryModal, setNewSubcategoryModal] = useState({ open: false, category: '' });
+    const [newSubcategoryName, setNewSubcategoryName] = useState('');
+
     const router = useRouter();
     const searchParams = useSearchParams();
     const pathname = usePathname();
@@ -68,22 +75,40 @@ function SidebarContent() {
         if (fileId) setSelectedFile(fileId);
     }, [open]);
 
+
+
     const fetchSidebarData = async () => {
         try {
+            // Fetch files
             const res = await fetch('/api/files?metadata=1');
             if (!res.ok) throw new Error('Failed to fetch files');
             const files = await res.json();
 
+            // Fetch custom subcategories
+            let customSubs = [];
+            try {
+                const customRes = await fetch('/api/subcategories');
+                if (customRes.ok) {
+                    customSubs = await customRes.json();
+                    console.log('Fetched custom subcategories:', customSubs);
+                } else {
+                    console.error('Failed to fetch subcategories:', customRes.status);
+                }
+            } catch (err) {
+                console.error('Error fetching subcategories:', err);
+            }
+
+            // Initialize organizedData with predefined structure
             const organizedData = {
                 'Company Tables': {
-                    icon: <IconBuilding className="h-5 w-5 shrink-0 text-white" />,
+                    icon: <FaBuilding className="h-5 w-5 shrink-0 text-white" />,
                     subcategories: {
                         'Products': { files: [] },
                         'Customers': { files: [] },
                     }
                 },
                 'Parameters': {
-                    icon: <IconSettings className="h-5 w-5 shrink-0 text-white" />,
+                    icon: <FaChartLine className="h-5 w-5 shrink-0 text-white" />,
                     subcategories: {
                         'Pricing Parameters': { files: [] },
                         'Tax Rates': { files: [] },
@@ -91,7 +116,7 @@ function SidebarContent() {
                     }
                 },
                 'Transactions': {
-                    icon: <IconHistory className="h-5 w-5 shrink-0 text-white" />,
+                    icon: <FaExchangeAlt className="h-5 w-5 shrink-0 text-white" />,
                     subcategories: {
                         'Historical Transactions': { files: [] },
                         'Other Transactions': { files: [] }
@@ -109,9 +134,31 @@ function SidebarContent() {
                 }
             };
 
+            // Add custom subcategories to organizedData
+            customSubs.forEach(sub => {
+                const category = sub.category;
+                const subcategory = sub.subcategory;
+
+                if (organizedData[category]) {
+                    // Initialize subcategories if needed
+                    if (!organizedData[category].subcategories) {
+                        organizedData[category].subcategories = {};
+                    }
+
+                    // Add custom subcategory if it doesn't exist
+                    if (!organizedData[category].subcategories[subcategory]) {
+                        organizedData[category].subcategories[subcategory] = { files: [] };
+                    }
+                }
+            });
+
+            console.log('After adding custom subs:', JSON.stringify(organizedData, null, 2));
+
+            // Process files
             files.forEach(file => {
                 const category = file.category || 'Other Tables';
                 const subcategory = file.subcategory || 'Uncategorized';
+
                 if (file.category === 'Price Lists') {
                     organizedData['Price Lists'].files.push({
                         id: file.id,
@@ -119,31 +166,29 @@ function SidebarContent() {
                         readOnly: file.readOnly || false
                     });
                 } else {
-                    if (organizedData[category] && organizedData[category].subcategories[subcategory]) {
-                        organizedData[category].subcategories[subcategory].files.push({
-                            id: file.id,
-                            filename: file.filename,
-                            readOnly: file.readOnly || false
-                        });
-                    } else {
-                        if (!organizedData[category]) {
-                            organizedData[category] = {
-                                icon: <IconFolder className="h-5 w-5 shrink-0 text-white" />,
-                                subcategories: {}
-                            };
-                        }
-                        if (!organizedData[category].subcategories[subcategory]) {
-                            organizedData[category].subcategories[subcategory] = { files: [] };
-                        }
-                        organizedData[category].subcategories[subcategory].files.push({
-                            id: file.id,
-                            filename: file.filename,
-                            readOnly: file.readOnly || false
-                        });
+                    // Ensure category exists
+                    if (!organizedData[category]) {
+                        organizedData[category] = {
+                            icon: <IconFolder className="h-5 w-5 shrink-0 text-white" />,
+                            subcategories: {}
+                        };
                     }
+
+                    // Ensure subcategory exists
+                    if (!organizedData[category].subcategories[subcategory]) {
+                        organizedData[category].subcategories[subcategory] = { files: [] };
+                    }
+
+                    // Add file to subcategory
+                    organizedData[category].subcategories[subcategory].files.push({
+                        id: file.id,
+                        filename: file.filename,
+                        readOnly: file.readOnly || false
+                    });
                 }
             });
 
+            console.log('Final organized data:', JSON.stringify(organizedData, null, 2));
             setSidebarData(organizedData);
         } catch (err) {
             console.error('Error fetching sidebar data:', err);
@@ -151,6 +196,7 @@ function SidebarContent() {
             setLoading(false);
         }
     };
+
 
     const toggleCategory = (category) => {
         setExpandedCategories(prev => ({
@@ -179,11 +225,32 @@ function SidebarContent() {
             icon: <IconBrandTabler className="h-5 w-5 shrink-0 text-white" />,
         },
         {
-            label: "Upload a file",
-            href: "/app-pages/upload",
-            icon: <FaFileExcel className="h-5 w-5 shrink-0 text-white" />,
+            label: "Create or Upload File",
+            href: "/app-pages/createOrUpload",
+            icon: <FaFileUpload className="h-5 w-5 shrink-0 text-white" />,
         }
     ];
+    const createSubcategory = async () => {
+        try {
+            const res = await fetch('/api/subcategories', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    category: newSubcategoryModal.category,
+                    subcategory: newSubcategoryName
+                })
+            });
+
+            if (res.ok) {
+                // Refresh sidebar data
+                fetchSidebarData();
+                setNewSubcategoryModal({ open: false, category: '' });
+                setNewSubcategoryName('');
+            }
+        } catch (err) {
+            console.error('Error creating subcategory:', err);
+        }
+    };
 
     return (
         <div
@@ -265,46 +332,55 @@ function SidebarContent() {
                                                         </button>
                                                     ))
                                                 ) : (
+                                                    <>
+                                                        {/* ADDED: Create Subcategory Button */}
+                                                        <button
+                                                            onClick={() => setNewSubcategoryModal({ open: true, category })}
+                                                            className="flex items-center gap-1 text-xs text-white mb-2"
+                                                        >
+                                                            <IconPlus size={12} /> Create Subcategory
+                                                        </button>
 
-                                                    Object.entries(categoryData.subcategories).map(([subcategory, subData]) => (
-                                                        <div key={subcategory} className="mt-1">
-                                                            <div className="flex items-center py-1 text-white">
-                                                                <IconFile className="h-4 w-4 mr-2" />
-                                                                <motion.span
-                                                                    animate={{
-                                                                        display: open ? "inline-block" : "none",
-                                                                        opacity: open ? 1 : 0,
-                                                                    }}
-                                                                    className="text-xs"
-                                                                >
-                                                                    {subcategory}
-                                                                </motion.span>
-                                                            </div>
-                                                            <div className="pl-6">
-                                                                {subData.files.map(file => (
-                                                                    <button
-                                                                        key={file.id}
-                                                                        onClick={() => handleFileSelect(file.id, category, subcategory)}
-                                                                        className={cn(
-                                                                            "block py-1 text-white text-xs truncate hover:underline w-full text-left",
-                                                                            selectedFile === file.id && "bg-blue-500 rounded px-2"
-                                                                        )}
-                                                                        title={file.filename}
+                                                        {Object.entries(categoryData.subcategories).map(([subcategory, subData]) => (
+                                                            <div key={subcategory} className="mt-1">
+                                                                <div className="flex items-center py-1 text-white">
+                                                                    <IconFile className="h-4 w-4 mr-2" />
+                                                                    <motion.span
+                                                                        animate={{
+                                                                            display: open ? "inline-block" : "none",
+                                                                            opacity: open ? 1 : 0,
+                                                                        }}
+                                                                        className="text-xs"
                                                                     >
-                                                                        <motion.span
-                                                                            animate={{
-                                                                                display: open ? "inline-block" : "none",
-                                                                                opacity: open ? 1 : 0,
-                                                                            }}
+                                                                        {subcategory}
+                                                                    </motion.span>
+                                                                </div>
+                                                                <div className="pl-6">
+                                                                    {subData.files.map(file => (
+                                                                        <button
+                                                                            key={file.id}
+                                                                            onClick={() => handleFileSelect(file.id, category, subcategory)}
+                                                                            className={cn(
+                                                                                "block py-1 text-white text-xs truncate hover:underline w-full text-left",
+                                                                                selectedFile === file.id && "bg-blue-500 rounded px-2"
+                                                                            )}
+                                                                            title={file.filename}
                                                                         >
-                                                                            {file.filename}
-                                                                            {file.readOnly && " (RO)"}
-                                                                        </motion.span>
-                                                                    </button>
-                                                                ))}
+                                                                            <motion.span
+                                                                                animate={{
+                                                                                    display: open ? "inline-block" : "none",
+                                                                                    opacity: open ? 1 : 0,
+                                                                                }}
+                                                                            >
+                                                                                {file.filename}
+                                                                                {file.readOnly && " (RO)"}
+                                                                            </motion.span>
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    ))
+                                                        ))}
+                                                    </>
                                                 )}
                                             </div>
                                         )}
@@ -329,6 +405,39 @@ function SidebarContent() {
                 </SidebarBody>
             </Sidebar>
             <Dashboard selectedFileId={selectedFile} />
+            <Modal
+                isOpen={newSubcategoryModal.open}
+                onClose={() => setNewSubcategoryModal({ open: false, category: '' })}
+                title={`Create Subcategory in ${newSubcategoryModal.category}`}
+            >
+                <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Subcategory Name
+                    </label>
+                    <input
+                        type="text"
+                        value={newSubcategoryName}
+                        onChange={(e) => setNewSubcategoryName(e.target.value)}
+                        placeholder="Enter subcategory name"
+                        className="w-full p-2 border rounded-md"
+                    />
+                </div>
+                <div className="flex justify-end gap-2">
+                    <button
+                        onClick={() => setNewSubcategoryModal({ open: false, category: '' })}
+                        className="px-4 py-2 bg-gray-300 rounded-md"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={createSubcategory}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md"
+                    >
+                        Create
+                    </button>
+                </div>
+            </Modal>
+
         </div>
     );
 }
@@ -674,7 +783,7 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
                             <textarea
                                 value={transformPrompt}
                                 onChange={(e) => setTransformPrompt(e.target.value)}
-                                placeholder="Enter instructions to transform the data (e.g., 'Create a new table linking each product to every customer')..."
+                                placeholder="Enter instructions to transform the data (e.g., 'Add a new row ')..."
                                 className="w-full h-40 p-3 border rounded-lg mb-4 dark:border-black dark:text-black"
                             />
                             <div className="flex justify-end gap-2">

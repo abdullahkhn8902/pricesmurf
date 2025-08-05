@@ -55,7 +55,7 @@ function parseAIResponse(response) {
 
 export async function GET(request) {
     // 1) Auth
-    const { userId } = await auth();
+    const { userId, getToken } = await auth();
     if (!userId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -93,7 +93,7 @@ export async function GET(request) {
             return NextResponse.json({ error: 'File not found' }, { status: 404 });
         }
 
-        // ADDED: Check if file is a pricing list
+        // Check if file is a pricing list
         if (file.metadata?.isPriceList) {
             // Skip AI categorization for pricing lists
             await db.collection('excelFiles.files').updateOne(
@@ -141,26 +141,81 @@ export async function GET(request) {
             );
         }
 
-        // 8) Build prompt
-        const classifyPrompt = `You are part of PriceSmurf.  
+        // Build base prompt without custom subcategories
+        let basePrompt = `You are part of PriceSmurf.  
 Classify this table into exactly one JSON with category & subcategory.
 
 CATEGORIES:
-🏢 Company Tables: Products, Customers, Extra Product Info, Extra Customer Info  
-⚙️ Parameters: Pricing Parameters, Tax Rates, Other Parameters  
-📅 Transactions: Historical Transactions, Other Transactions  
+🏢 Company Tables: Products, Customers  
+⚙️ Parameters: Pricing Parameters, Tax Rates  
+📅 Transactions: Historical Transactions  
 📂 Other Tables: Uncategorized  
 
-Return ONLY JSON with no additional text, e.g.: 
+For your help more explanation :
+A table containing ProductID, ProductName, etc. → Company Tables > Products
+A table containing CustomerID, CustomerName → Company Tables > Customers
+A table containing Country, TaxRate → Parameters
+Historical sales transactions → Transactions
+
+For tables containing multiple columns of different categories just analyze which category has highest number of columns suggest that category and subcategory accordingly.
+
+Return ONLY JSON with no additional text. Example: 
 {"category":"Company Tables","subcategory":"Products"}
 
 Columns: ${JSON.stringify(headers)}  
 Sample Rows:  
 ${sampleRows.map(r => JSON.stringify(r)).join('\n')}`;
 
-        // 9) Call AI with robust error handling
+        // Try to add custom subcategories if available
+        try {
+            const token = await getToken();
+            const requestOrigin = request.headers.get('origin') || new URL(request.url).origin;
+            const subcategoriesUrl = `${requestOrigin}/api/subcategories`;
+
+            const subsRes = await fetch(subcategoriesUrl, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (subsRes.ok) {
+                const customSubs = await subsRes.json();
+                const customSubsByCategory = customSubs.reduce((acc, sub) => {
+                    if (!acc[sub.category]) acc[sub.category] = [];
+                    acc[sub.category].push(sub.subcategory);
+                    return acc;
+                }, {});
+
+                // Build enhanced prompt with custom subcategories
+                basePrompt = `You are part of PriceSmurf.  
+Classify this table into exactly one JSON with category & subcategory.
+
+CATEGORIES (including user-specific options):
+🏢 Company Tables: Products, Customers${customSubsByCategory['Company Tables'] ? `, ${customSubsByCategory['Company Tables'].join(', ')}` : ''}  
+⚙️ Parameters: Pricing Parameters, Tax Rates${customSubsByCategory['Parameters'] ? `, ${customSubsByCategory['Parameters'].join(', ')}` : ''}  
+📅 Transactions: Historical Transactions${customSubsByCategory['Transactions'] ? `, ${customSubsByCategory['Transactions'].join(', ')}` : ''}  
+📂 Other Tables: Uncategorized${customSubsByCategory['Other Tables'] ? `, ${customSubsByCategory['Other Tables'].join(', ')}` : ''}  
+
+For your help more explanation :
+A table containing ProductID, ProductName, etc. → Company Tables > Products
+A table containing CustomerID, CustomerName → Company Tables > Customers
+A table containing Country, TaxRate → Parameters
+Historical sales transactions → Transactions
+
+For tables containing multiple columns of different categories just analyze which category has highest number of columns suggest that category and subcategory accordingly.
+
+Return ONLY JSON with no additional text. Example: 
+{"category":"Company Tables","subcategory":"Products"}
+
+Columns: ${JSON.stringify(headers)}  
+Sample Rows:  
+${sampleRows.map(r => JSON.stringify(r)).join('\n')}`;
+            }
+        } catch (err) {
+            console.error('Error fetching subcategories, using base prompt:', err);
+        }
+
+        // 8) Call AI with robust error handling
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
+        const timeout = setTimeout(() => controller.abort(), 45000); // 45s timeout
 
         const aiRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
@@ -170,9 +225,12 @@ ${sampleRows.map(r => JSON.stringify(r)).join('\n')}`;
             },
             body: JSON.stringify({
                 model: 'deepseek/deepseek-r1:free',
-                messages: [{ role: 'user', content: classifyPrompt }],
+                messages: [{
+                    role: 'user',
+                    content: basePrompt
+                }],
                 temperature: 0.2,
-                max_tokens: 300
+                max_tokens: 500 // Increased to allow full response
             }),
             signal: controller.signal
         }).finally(() => clearTimeout(timeout));
@@ -185,17 +243,25 @@ ${sampleRows.map(r => JSON.stringify(r)).join('\n')}`;
         }
 
         const aiJson = await aiRes.json();
+        console.log('OpenRouter API response:', JSON.stringify(aiJson, null, 2));
 
-        // Validate response structure
-        if (!aiJson.choices?.[0]?.message?.content) {
-            console.error('Invalid OpenRouter response:', JSON.stringify(aiJson, null, 2));
-            throw new Error('Invalid response structure from AI service');
+        // Enhanced response validation
+        let rawText = '';
+        if (aiJson.choices?.[0]?.message?.content) {
+            rawText = aiJson.choices[0].message.content.trim();
+        } else if (aiJson.choices?.[0]?.message?.reasoning) {
+            // Fallback to reasoning field if content is empty
+            rawText = aiJson.choices[0].message.reasoning.trim();
         }
 
-        const rawText = aiJson.choices[0].message.content.trim();
+        if (!rawText) {
+            console.error('Invalid OpenRouter response:', JSON.stringify(aiJson, null, 2));
+            throw new Error('AI response is empty');
+        }
+
         console.log('📝 [Categorize API] Raw AI response:', rawText);
 
-        // 10) Parse JSON with robust handling
+        // 9) Parse JSON with robust handling
         let classification;
         try {
             classification = parseAIResponse(rawText);
@@ -210,7 +276,7 @@ ${sampleRows.map(r => JSON.stringify(r)).join('\n')}`;
             throw new Error('AI response missing category or subcategory');
         }
 
-        // 11) Persist metadata
+        // 10) Persist metadata
         await db.collection('excelFiles.files').updateOne(
             { _id: new ObjectId(fileId), 'metadata.userId': userId },
             {
@@ -221,7 +287,7 @@ ${sampleRows.map(r => JSON.stringify(r)).join('\n')}`;
             }
         );
 
-        // 12) Return to client
+        // 11) Return to client
         return NextResponse.json(
             {
                 category: classification.category,

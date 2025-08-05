@@ -311,7 +311,7 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
                                                 id="customPrompt"
                                                 checked={customPromptEnabled}
                                                 onChange={(e) => setCustomPromptEnabled(e.target.checked)}
-                                                className="size-5 rounded border-gray-300 shadow-sm"
+                                                className="size-5 rounded border-gray-300 shadow-sm text-indigo-900"
                                             />
                                             <label htmlFor="customPrompt" className="text-gray-700 font-medium">
                                                 Use custom prompt
@@ -324,7 +324,7 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
                                                     value={customPrompt}
                                                     onChange={(e) => setCustomPrompt(e.target.value)}
                                                     placeholder="Anything that helps our AI model do your task more efficiently"
-                                                    className="w-full rounded border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 h-32"
+                                                    className="w-full rounded border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 h-32 text-indigo-900"
                                                 />
                                             </div>
                                         )}
