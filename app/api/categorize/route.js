@@ -185,25 +185,22 @@ ${sampleRows.map(r => JSON.stringify(r)).join('\n')}`;
                 }, {});
 
                 // Build enhanced prompt with custom subcategories
-                basePrompt = `You are part of PriceSmurf.  
-Classify this table into exactly one JSON with category & subcategory.
+                let basePrompt = `You are part of PriceSmurf. Classify this table into exactly one JSON object with category & subcategory.
 
-CATEGORIES (including user-specific options):
-🏢 Company Tables: Products, Customers${customSubsByCategory['Company Tables'] ? `, ${customSubsByCategory['Company Tables'].join(', ')}` : ''}  
-⚙️ Parameters: Pricing Parameters, Tax Rates${customSubsByCategory['Parameters'] ? `, ${customSubsByCategory['Parameters'].join(', ')}` : ''}  
-📅 Transactions: Historical Transactions${customSubsByCategory['Transactions'] ? `, ${customSubsByCategory['Transactions'].join(', ')}` : ''}  
-📂 Other Tables: Uncategorized${customSubsByCategory['Other Tables'] ? `, ${customSubsByCategory['Other Tables'].join(', ')}` : ''}  
+STRICT RULES:
+1. Return ONLY pure JSON without any additional text, explanations, or code blocks
+2. Use this exact format: {"category":"Category Name","subcategory":"Subcategory Name"}
 
-For your help more explanation :
-A table containing ProductID, ProductName, etc. → Company Tables > Products
-A table containing CustomerID, CustomerName → Company Tables > Customers
-A table containing Country, TaxRate → Parameters
-Historical sales transactions → Transactions
+CATEGORIES:
+🏢 Company Tables: Products, Customers  
+⚙️ Parameters: Pricing Parameters, Tax Rates  
+📅 Transactions: Historical Transactions  
+📂 Other Tables: Uncategorized  
 
-For tables containing multiple columns of different categories just analyze which category has highest number of columns suggest that category and subcategory accordingly.
-
-Return ONLY JSON with no additional text. Example: 
-{"category":"Company Tables","subcategory":"Products"}
+EXAMPLES:
+- Columns: ["ProductID", "ProductName"] → {"category":"Company Tables","subcategory":"Products"}
+- Columns: ["CustomerID", "CustomerName"] → {"category":"Company Tables","subcategory":"Customers"}
+- Columns: ["TaxRate", "Country"] → {"category":"Parameters","subcategory":"Tax Rates"}
 
 Columns: ${JSON.stringify(headers)}  
 Sample Rows:  
@@ -268,7 +265,31 @@ ${sampleRows.map(r => JSON.stringify(r)).join('\n')}`;
         } catch (e) {
             console.error('JSON parse error:', e.message);
             console.error('Raw content:', rawText.substring(0, 500));
-            throw new Error('Failed to parse AI response: ' + e.message);
+
+            const fixResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'deepseek/deepseek-r1:free',
+                    messages: [{
+                        role: 'user',
+                        content: `Fix this JSON output: ${rawText.substring(0, 1000)}\n\nReturn ONLY valid JSON.`
+                    }],
+                    temperature: 0.1,
+                    max_tokens: 200
+                })
+            });
+
+            if (fixResponse.ok) {
+                const fixJson = await fixResponse.json();
+                const fixedText = fixJson.choices[0].message.content.trim();
+                classification = parseAIResponse(fixedText);
+            } else {
+                throw new Error('Failed to fix AI response: ' + e.message);
+            }
         }
 
         // Validate classification structure

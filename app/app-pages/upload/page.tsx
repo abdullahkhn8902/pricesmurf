@@ -43,6 +43,7 @@ function FileUploadDemoWithParams() {
 
 // Main component content
 function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
+    const [isReadOnly, setIsReadOnly] = useState(false);
     const [files, setFiles] = useState<File[]>([]);
     const [uploadStatus, setUploadStatus] = useState<UploadStatus | null>(null);
     const [loading, setLoading] = useState(false);
@@ -55,8 +56,13 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [metadataSaved, setMetadataSaved] = useState(false);
     const [createNewTable, setCreateNewTable] = useState(false);
-    const [isReadOnly, setIsReadOnly] = useState(false);
     const [uploadedFileIds, setUploadedFileIds] = useState<string[]>([]);
+
+    useEffect(() => {
+        if (files.length < 2 && combineData) {
+            setCombineData(false);
+        }
+    }, [files, combineData]);
 
     const handleFilesChange = (newFiles: File[]) => {
         setFiles((prev) => [
@@ -87,8 +93,8 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
             const formData = new FormData();
             formData.append("file", file);
             formData.append("sessionId", newSessionId);
-            formData.append("isReadOnly", isReadOnly.toString());
             formData.append("isPriceList", isPriceList.toString());
+            formData.append("isReadOnly", isReadOnly.toString());
 
             try {
                 const res = await fetch("/api/upload", {
@@ -133,44 +139,54 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
         setLoading(false);
     };
 
+
+
     const handleCombineAndRedirect = async () => {
         setIsProcessing(true);
         try {
-            const response = await fetch('/api/combine', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Cookie': document.cookie
-                },
-                body: JSON.stringify({ sessionId })
-            });
+            const filesToUpdate = [...uploadedFileIds];
 
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Failed to process files');
+            // Process combined file if needed
+            if (combineData) {
+                const response = await fetch('/api/combine', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Cookie': document.cookie
+                    },
+                    body: JSON.stringify({
+                        sessionId, isReadOnly
+                    })
+                });
 
-            if (data.combinedFileId) {
-                try {
-                    const catRes = await fetch(`/api/categorize?fileId=${data.combinedFileId}`, {
-                        method: 'GET',
-                        credentials: 'include',
-                    });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Failed to process files');
 
-                    if (!catRes.ok) {
-                        console.error('Combined file categorization failed', catRes.status);
+                if (data.combinedFileId) {
+                    filesToUpdate.push(data.combinedFileId);
+
+                    try {
+                        await fetch(`/api/categorize?fileId=${data.combinedFileId}`, {
+                            method: 'GET',
+                            credentials: 'include',
+                        });
+                    } catch (err) {
+                        console.error('Combined file categorization error', err);
                     }
-                } catch (err) {
-                    console.error('Combined file categorization error', err);
                 }
             }
 
-            const categorizePromises = uploadedFileIds.map(id =>
-                fetch(`/api/categorize?fileId=${id}`, {
-                    method: 'GET',
-                    credentials: 'include',
-                })
+            // Categorize individual files
+            await Promise.allSettled(
+                uploadedFileIds.map(id =>
+                    fetch(`/api/categorize?fileId=${id}`, {
+                        method: 'GET',
+                        credentials: 'include',
+                    })
+                )
             );
 
-            await Promise.allSettled(categorizePromises);
+
             router.push('/app-pages/dashboard');
         } catch (error) {
             console.error('Combine error:', error);
@@ -210,6 +226,10 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
         }
     };
 
+
+
+
+
     const handleClear = () => {
         setFiles([]);
         setUploadStatus(null);
@@ -223,7 +243,23 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
                 </div>
             )}
             <FileUpload files={files} onChange={handleFilesChange} />
-
+            <div className="p-4 border-b border-indigo-200">
+                <div className="flex items-center gap-2">
+                    <input
+                        type="checkbox"
+                        id="readOnlyToggle"
+                        checked={isReadOnly}
+                        onChange={(e) => setIsReadOnly(e.target.checked)}
+                        className="size-5 rounded border-gray-300 shadow-sm"
+                    />
+                    <label htmlFor="readOnlyToggle" className="text-gray-700 font-medium flex items-center gap-2">
+                        Mark all files as Read-Only <FaLock className="text-red-500" />
+                    </label>
+                </div>
+                <p className="text-sm text-gray-500 mt-1">
+                    Files will be protected from modifications. This setting can't be changed later.
+                </p>
+            </div>
             <div className="mt-4 flex gap-4 m-5">
                 <button
                     onClick={handleUploadAll}
@@ -279,11 +315,22 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
                                                 type="checkbox"
                                                 id="combine"
                                                 checked={combineData}
-                                                onChange={(e) => setCombineData(e.target.checked)}
-                                                className="size-5 rounded border-gray-300 shadow-sm"
+                                                onChange={(e) => files.length >= 2 && setCombineData(e.target.checked)}
+                                                disabled={files.length < 2}
+                                                className={`size-5 rounded border-gray-300 shadow-sm ${files.length < 2 ? 'opacity-50 cursor-not-allowed' : ''
+                                                    }`}
                                             />
-                                            <label htmlFor="combine" className="text-gray-700 font-medium">
+                                            <label
+                                                htmlFor="combine"
+                                                className={`text-gray-700 font-medium ${files.length < 2 ? 'opacity-50' : ''
+                                                    }`}
+                                            >
                                                 Do you want to combine the data?
+                                                {files.length < 2 && (
+                                                    <span className="text-xs text-red-500 block">
+                                                        (Requires 2+ files)
+                                                    </span>
+                                                )}
                                             </label>
                                         </div>
 
