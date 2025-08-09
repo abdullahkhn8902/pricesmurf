@@ -408,7 +408,11 @@ function SidebarContent() {
             <Modal
                 isOpen={newSubcategoryModal.open}
                 onClose={() => setNewSubcategoryModal({ open: false, category: '' })}
-                title={`Create Subcategory in ${newSubcategoryModal.category}`}
+                title={
+                    <span className="text-indigo-900 font-semibold">
+                        Create Subcategory in {newSubcategoryModal.category}
+                    </span>
+                }
             >
                 <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -419,13 +423,13 @@ function SidebarContent() {
                         value={newSubcategoryName}
                         onChange={(e) => setNewSubcategoryName(e.target.value)}
                         placeholder="Enter subcategory name"
-                        className="w-full p-2 border rounded-md"
+                        className="w-full p-2 border rounded-md text-indigo-900"
                     />
                 </div>
                 <div className="flex justify-end gap-2">
                     <button
                         onClick={() => setNewSubcategoryModal({ open: false, category: '' })}
-                        className="px-4 py-2 bg-gray-300 rounded-md"
+                        className="px-4 py-2 bg-gray-500 rounded-md"
                     >
                         Cancel
                     </button>
