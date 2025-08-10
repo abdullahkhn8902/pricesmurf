@@ -256,9 +256,7 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
                         Mark all files as Read-Only <FaLock className="text-red-500" />
                     </label>
                 </div>
-                <p className="text-sm text-gray-500 mt-1">
-                    Files will be protected from modifications. This setting can't be changed later.
-                </p>
+
             </div>
             <div className="mt-4 flex gap-4 m-5">
                 <button
