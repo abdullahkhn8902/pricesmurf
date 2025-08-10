@@ -191,13 +191,13 @@ export async function GET(request) {
             if (metadataOnly) {
                 const files = await filesCollection
                     .find({ 'metadata.userId': userId })
+                    .sort({ uploadDate: -1 })
                     .project({
                         _id: 1,
                         filename: 1,
                         'metadata.category': 1,
                         'metadata.subcategory': 1,
                         'metadata.isReadOnly': 1,
-                        // ADDED: Project pricing list flag
                         'metadata.isPriceList': 1
                     })
                     .toArray();
@@ -218,6 +218,7 @@ export async function GET(request) {
 
             const files = await filesCollection
                 .find({ 'metadata.userId': userId })
+                .sort({ uploadDate: -1 })
                 .toArray();
 
             return new Response(JSON.stringify(files.map(file => ({
