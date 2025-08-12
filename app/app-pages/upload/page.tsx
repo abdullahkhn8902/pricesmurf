@@ -20,8 +20,11 @@ interface UploadStatus {
 
 interface SessionMetadata {
     combineData: boolean;
+    createNewTable: boolean;
     joinType: string;
     customPrompt: string;
+    newTableName: string;
+    isReadOnly: boolean;
 }
 
 function generateSessionId() {
@@ -57,6 +60,7 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
     const [metadataSaved, setMetadataSaved] = useState(false);
     const [createNewTable, setCreateNewTable] = useState(false);
     const [uploadedFileIds, setUploadedFileIds] = useState<string[]>([]);
+    const [newTableName, setNewTableName] = useState(""); // New state for table name
 
     useEffect(() => {
         if (files.length < 2 && combineData) {
@@ -139,8 +143,6 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
         setLoading(false);
     };
 
-
-
     const handleCombineAndRedirect = async () => {
         setIsProcessing(true);
         try {
@@ -155,7 +157,9 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
                         'Cookie': document.cookie
                     },
                     body: JSON.stringify({
-                        sessionId, isReadOnly
+                        sessionId,
+                        isReadOnly,
+                        newTableName // Pass new table name to API
                     })
                 });
 
@@ -186,7 +190,6 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
                 )
             );
 
-
             router.push('/app-pages/dashboard');
         } catch (error) {
             console.error('Combine error:', error);
@@ -197,12 +200,19 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
     };
 
     const saveSessionMetadata = async () => {
-        const metadata = {
+        // Validate new table name if needed
+        if ((combineData || createNewTable) && !newTableName.trim()) {
+            alert("Please suggest a name for the new table");
+            return false;
+        }
+
+        const metadata: SessionMetadata = {
             combineData,
             createNewTable,
             joinType: selectedJoin,
             isReadOnly,
-            customPrompt: customPromptEnabled ? customPrompt : ""
+            customPrompt: customPromptEnabled ? customPrompt : "",
+            newTableName: newTableName.trim() // Add to metadata
         };
 
         try {
@@ -225,10 +235,6 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
             return false;
         }
     };
-
-
-
-
 
     const handleClear = () => {
         setFiles([]);
@@ -402,6 +408,27 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
                                                 Create a new table linking the files
                                             </label>
                                         </div>
+
+                                        {/* New Table Name Input */}
+                                        {(combineData || createNewTable) && (
+                                            <div className="mt-4">
+                                                <label
+                                                    htmlFor="newTableName"
+                                                    className="block text-gray-700 font-medium mb-2"
+                                                >
+                                                    Suggest a name for the new table
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    id="newTableName"
+                                                    value={newTableName}
+                                                    onChange={(e) => setNewTableName(e.target.value)}
+                                                    className="w-full rounded border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-900"
+                                                    placeholder="Enter a name for the new table"
+                                                    required
+                                                />
+                                            </div>
+                                        )}
 
                                     </ModalContent>
                                     <ModalFooter className="gap-4">

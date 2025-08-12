@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { Sidebar, SidebarBody, SidebarLink } from "@/component-app/ui/sidebar";
 import Modal from "@/component-app/ui/Modal";
+import { IconPencil } from "@tabler/icons-react";
 import {
     IconBrandTabler,
     IconFolder,
@@ -159,12 +160,15 @@ function SidebarContent() {
                 const category = file.category || 'Other Tables';
                 const subcategory = file.subcategory || 'Uncategorized';
 
+                // Create consistent file data object
+                const fileData = {
+                    id: file.id,
+                    filename: file.filename,
+                    readOnly: file.readOnly || false
+                };
+
                 if (file.category === 'Price Lists') {
-                    organizedData['Price Lists'].files.push({
-                        id: file.id,
-                        filename: file.filename,
-                        readOnly: file.readOnly || false
-                    });
+                    organizedData['Price Lists'].files.push(fileData);
                 } else {
                     // Ensure category exists
                     if (!organizedData[category]) {
@@ -180,14 +184,9 @@ function SidebarContent() {
                     }
 
                     // Add file to subcategory
-                    organizedData[category].subcategories[subcategory].files.push({
-                        id: file.id,
-                        filename: file.filename,
-                        readOnly: file.readOnly || false
-                    });
+                    organizedData[category].subcategories[subcategory].files.push(fileData);
                 }
             });
-
             console.log('Final organized data:', JSON.stringify(organizedData, null, 2));
             setSidebarData(organizedData);
         } catch (err) {
@@ -213,6 +212,7 @@ function SidebarContent() {
         params.set('subcategory', subcategory);
         router.replace(`${pathname}?${params.toString()}`);
     };
+
 
     const handleCreatePriceList = () => {
         router.push('/app-pages/createOrUpload?purpose=price-list');
@@ -451,6 +451,8 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
+    const [isEditingFileName, setIsEditingFileName] = useState(false);
+    const [newFileName, setNewFileName] = useState('');
 
     const [isClient, setIsClient] = useState(false);
     const [files, setFiles] = useState([]);
@@ -473,6 +475,10 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
     const [newColumnName, setNewColumnName] = useState('');
     const [columnToRemove, setColumnToRemove] = useState(null);
     const [isReadOnly, setIsReadOnly] = useState(false);
+    const [showAddRowModal, setShowAddRowModal] = useState(false);
+    const [newRowData, setNewRowData] = useState({});
+    const [columnDefaultValue, setColumnDefaultValue] = useState('');
+    const [newColumnRowValues, setNewColumnRowValues] = useState({});
 
     const sanitizeColumnName = (name) => {
         return (name || '').toString().replace(/[^a-zA-Z0-9\s_-]/g, '').trim() || 'Unnamed';
@@ -602,10 +608,7 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
             setError('No file selected');
             return;
         }
-        if (isReadOnly) {
-            setError('Cannot save changes to a read-only file');
-            return;
-        }
+
         setIsLoading(true);
         try {
             const response = await fetch(`/api/update?id=${selectedFileId}`, {
@@ -683,17 +686,22 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
             return;
         }
 
-        const newData = data.map(row => ({
+        // Create new column with values for each row
+        const newData = data.map((row, index) => ({
             ...row,
-            [sanitized]: ''
+            [sanitized]: newColumnRowValues[index] || ''
         }));
 
         setColumns([...columns, sanitized]);
         setData(newData);
         setShowAddColumnModal(false);
         setNewColumnName('');
+        setNewColumnRowValues({}); // Reset row values
         setError('');
     };
+
+
+
 
     const handleRemoveColumn = (columnName) => {
         if (columns.length <= 1) {
@@ -712,16 +720,182 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
         setColumnToRemove(null);
     };
 
+    const handleSaveFileName = async () => {
+        if (!selectedFileId) return;
+
+        setIsLoading(true);
+        try {
+            const response = await fetch('/api/update-filename', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: selectedFileId,
+                    newFilename: newFileName
+                })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                // Use the actual updated filename from the response
+                setSheetName(result.newFilename);
+                setFiles(prevFiles =>
+                    prevFiles.map(file =>
+                        file.id === selectedFileId
+                            ? { ...file, filename: result.newFilename }
+                            : file
+                    )
+                );
+                setIsEditingFileName(false);
+            } else {
+                throw new Error(result.error || 'Failed to update filename');
+            }
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleToggleReadOnly = async () => {
+        if (!selectedFileId) return;
+
+        setIsLoading(true);
+        try {
+            const response = await fetch('/api/update-readonly', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: selectedFileId,
+                    readOnly: !isReadOnly
+                })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                // Update local state
+                setIsReadOnly(!isReadOnly);
+
+                // Update files list
+                setFiles(prevFiles =>
+                    prevFiles.map(file =>
+                        file.id === selectedFileId
+                            ? { ...file, readOnly: !isReadOnly }
+                            : file
+                    )
+                );
+            } else {
+                throw new Error(result.error || 'Failed to update read-only status');
+            }
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    const handleAddRow = () => {
+        // Check if any value is provided
+        const hasValue = Object.values(newRowData).some(val => val !== '');
+
+        if (!hasValue) {
+            setError('Please enter at least one value for the new row');
+            return;
+        }
+
+        // Create new row with user-provided values
+        const newRow = {};
+        columns.forEach(col => {
+            newRow[col] = newRowData[col] || '';
+        });
+
+        setData([...data, newRow]);
+        setShowAddRowModal(false);
+        setNewRowData({});
+        setError('');
+    };
+
+    const handleRowInputChange = (col, value) => {
+        setNewRowData(prev => ({
+            ...prev,
+            [col]: value
+        }));
+    };
+
+
     return (
         <div className="flex flex-1">
             <div className="flex w-full flex-1 flex-col gap-2 rounded-tl-2xl border border-neutral-200 bg-gray-200 p-2 md:p-10">
                 <div className="flex justify-between items-center mt-2 px-4">
-                    <div className="text-xl font-bold text-center w-full dark:text-indigo-900">{sheetName}
-                        {isReadOnly && (
-                            <span className="px-2 py-2 bg-yellow-500 text-white text-xs rounded-md ml-10">
-                                Read-Only
-                            </span>
+                    <div className="flex items-center justify-center w-full">
+                        {isEditingFileName ? (
+                            <div className="flex items-center">
+                                <input
+                                    type="text"
+                                    value={newFileName}
+                                    onChange={(e) => setNewFileName(e.target.value)}
+                                    className="text-xl font-bold text-center dark:text-indigo-900 border-b border-indigo-900 bg-transparent px-2"
+                                    autoFocus
+                                />
+                                <button
+                                    onClick={handleSaveFileName}
+                                    className="ml-2 px-2 py-1 bg-green-500 text-white rounded"
+                                >
+                                    Save
+                                </button>
+                                <button
+                                    onClick={() => setIsEditingFileName(false)}
+                                    className="ml-1 px-2 py-1 bg-gray-500 text-white rounded"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex items-center">
+                                <div className="text-xl font-bold dark:text-indigo-900">
+                                    {sheetName}
+                                </div>
+                                {!isReadOnly && (
+                                    <button
+                                        onClick={() => {
+                                            setIsEditingFileName(true);
+                                            setNewFileName(sheetName);
+                                        }}
+                                        className="ml-2 text-indigo-900 hover:text-indigo-700"
+                                    >
+                                        <IconPencil size={18} />
+                                    </button>
+                                )}
+                            </div>
                         )}
+                        <div className="ml-4 flex items-center">
+                            <label
+                                htmlFor="readOnlyToggle"
+                                className={cn(
+                                    "relative block h-6 w-12 rounded-full transition-colors [-webkit-tap-highlight-color:_transparent]",
+                                    isReadOnly ? "bg-yellow-500" : "bg-green-500"
+                                )}
+                            >
+                                <input
+                                    type="checkbox"
+                                    id="readOnlyToggle"
+                                    className="peer sr-only"
+                                    checked={!isReadOnly}
+                                    onChange={handleToggleReadOnly}
+                                    disabled={isLoading}
+                                />
+                                <span
+                                    className={cn(
+                                        "absolute inset-y-0 start-0 m-0.5 size-5 rounded-full bg-white transition-all duration-300",
+                                        isReadOnly ? "start-0" : "start-6"
+                                    )}
+                                ></span>
+                            </label>
+                            <span className="ml-2 text-xs font-medium text-indigo-900">
+                                {isReadOnly ? "Read-Only" : "Editable"}
+                            </span>
+                        </div>
+
                     </div>
 
                     <div className="flex gap-2">
@@ -741,7 +915,7 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
 
                         <button
                             onClick={handleSaveChanges}
-                            disabled={isLoading || isReadOnly}
+                            disabled={isLoading}
                             className="px-4 py-2 bg-green-600 text-white rounded-lg disabled:opacity-50"
                         >
                             Save Changes
@@ -809,20 +983,95 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
                     </div>
                 )}
 
-                {showAddColumnModal && (
+                {showAddRowModal && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                        <div className="bg-white p-6 rounded-lg w-full max-w-md">
-                            <h3 className="text-lg font-semibold mb-4 dark:text-black">Add New Column</h3>
-                            <input
-                                value={newColumnName}
-                                onChange={(e) => setNewColumnName(e.target.value)}
-                                placeholder="Enter column name"
-                                className="w-full p-3 border rounded-lg mb-4 dark:border-black dark:text-black"
-                            />
-                            {error && <div className="text-red-500 mb-2">{error}</div>}
+                        <div className="bg-white p-6 rounded-lg w-full max-w-2xl">
+                            <h3 className="text-lg font-semibold mb-4 dark:text-black">Add New Row</h3>
+                            {error && <div className="text-red-500 mb-4">{error}</div>}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 max-h-[50vh] overflow-y-auto">
+                                {columns.map(col => (
+                                    <div key={col} className="mb-3">
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-black mb-1">
+                                            {col}
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={newRowData[col] || ''}
+                                            onChange={(e) => handleRowInputChange(col, e.target.value)}
+                                            className="w-full border rounded-lg p-2 dark:text-black"
+                                            placeholder={`Enter ${col}`}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
                             <div className="flex justify-end gap-2">
                                 <button
-                                    onClick={() => setShowAddColumnModal(false)}
+                                    onClick={() => {
+                                        setShowAddRowModal(false);
+                                        setNewRowData({});
+                                        setError('');
+                                    }}
+                                    className="px-4 py-2 bg-gray-300 rounded-lg dark:text-black"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleAddRow}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+                                >
+                                    Add Row
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+
+                {showAddColumnModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-white p-6 rounded-lg w-full max-w-2xl">
+                            <h3 className="text-lg font-semibold mb-4 dark:text-black">Add New Column</h3>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-black">
+                                    Column Name
+                                </label>
+                                <input
+                                    value={newColumnName}
+                                    onChange={(e) => setNewColumnName(e.target.value)}
+                                    placeholder="Enter column name"
+                                    className="w-full p-3 border rounded-lg mb-4 dark:border-black dark:text-black"
+                                />
+                            </div>
+
+                            <div className="max-h-[50vh] overflow-y-auto">
+                                <h4 className="text-md font-medium mb-3 dark:text-black">
+                                    Enter values for each row:
+                                </h4>
+                                {data.map((_, index) => (
+                                    <div key={index} className="flex items-center mb-2">
+                                        <span className="mr-2 w-16 dark:text-black">Row {index + 1}:</span>
+                                        <input
+                                            value={newColumnRowValues[index] || ''}
+                                            onChange={(e) => setNewColumnRowValues(prev => ({
+                                                ...prev,
+                                                [index]: e.target.value
+                                            }))}
+                                            className="flex-1 p-2 border rounded dark:border-black dark:text-black"
+                                            placeholder={`Value for row ${index + 1}`}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+
+                            {error && <div className="text-red-500 mb-2">{error}</div>}
+                            <div className="flex justify-end gap-2 mt-4">
+                                <button
+                                    onClick={() => {
+                                        setShowAddColumnModal(false);
+                                        setNewColumnName('');
+                                        setNewColumnRowValues({});
+                                        setError('');
+                                    }}
                                     className="px-4 py-2 bg-gray-300 rounded-lg dark:text-black"
                                 >
                                     Cancel
@@ -837,6 +1086,7 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
                         </div>
                     </div>
                 )}
+
 
                 {columnToRemove && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -868,7 +1118,7 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
                 )}
 
                 {analysis && (
-                    <div className="mt-4 max-h-[40vh] overflow-y-auto bg-white p-4 rounded-lg shadow-md relative z-10">
+                    <div className="mt-4 max-h-[100vh] overflow-y-auto bg-white p-4 rounded-lg shadow-md relative z-10">
                         <h3 className="text-lg font-semibold mb-2 text-indigo-900">PriceSmurf AI</h3>
                         <div className="whitespace-pre-line text-gray-700">
                             {analysis}
@@ -933,11 +1183,19 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
                                         <th className="px-6 py-3 flex items-center gap-2">
                                             <span>Action</span>
                                             <button
+                                                onClick={() => setShowAddRowModal(true)}
+                                                className="text-indigo-900 hover:text-white bg-indigo-200 p-2 rounded-full"
+                                                title="Add new row"
+                                            >
+                                                ➕Add row
+                                            </button>
+
+                                            <button
                                                 onClick={() => setShowAddColumnModal(true)}
-                                                className="text-white hover:text-green-200 bg-indigo-200 p-2 rounded-full"
+                                                className="text-indigo-900 hover:text-white bg-indigo-200 p-2 rounded-full"
                                                 title="Add new column"
                                             >
-                                                ➕
+                                                ➕Add column
                                             </button>
                                         </th>
                                     </tr>

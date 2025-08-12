@@ -453,8 +453,23 @@ COLUMN STANDARDIZATION PRINCIPLES:
         // FIX: Generate Excel buffer from workbook
         const excelBuffer = await newWorkbook.xlsx.writeBuffer();
 
+        let filename;
+        if (sessionMetadata?.newTableName) {
+            // Sanitize filename and ensure it has .xlsx extension
+            const cleanName = sessionMetadata.newTableName
+                .replace(/[^a-zA-Z0-9_-]/g, '_') // Replace special chars
+                .replace(/\s+/g, '_')             // Replace spaces
+                .substring(0, 100);               // Limit length
+
+            filename = `${cleanName}.xlsx`;
+        } else if (createNewTable) {
+            filename = `new-table-${Date.now()}.xlsx`;
+        } else {
+            filename = `combined-${Date.now()}.xlsx`;
+        }
+
         // Store in GridFS
-        const uploadStream = bucket.openUploadStream(`combined-${Date.now()}.xlsx`, {
+        const uploadStream = bucket.openUploadStream(filename, {
             contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             metadata: {
                 userId,
@@ -463,7 +478,8 @@ COLUMN STANDARDIZATION PRINCIPLES:
                 isCombined: true,
                 sourceFileIds: fileIds,
                 requestStartTime,
-                isReadOnly: sessionMetadata?.isReadOnly || false
+                isReadOnly: sessionMetadata?.isReadOnly || false,
+                customName: sessionMetadata?.newTableName || "" // Add this
             }
         });
 

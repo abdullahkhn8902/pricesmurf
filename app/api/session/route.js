@@ -16,16 +16,21 @@ export async function POST(request) {
         await client.connect();
         const db = client.db('Project0');
 
-        // Store/update session metadata with read-only status
+        // Prepare metadata object with default values
+        const sessionData = {
+            combineData: metadata.combineData || false,
+            createNewTable: metadata.createNewTable || false,
+            joinType: metadata.joinType || '',
+            customPrompt: metadata.customPrompt || '',
+            newTableName: metadata.newTableName || '',
+            isReadOnly: metadata.isReadOnly || false,
+            updatedAt: new Date()
+        };
+
+        // Store/update session metadata
         await db.collection('sessionMetadata').updateOne(
             { sessionId },
-            {
-                $set: {
-                    ...metadata,
-                    updatedAt: new Date(),
-                    isReadOnly: metadata.isReadOnly || false
-                }
-            },
+            { $set: sessionData },
             { upsert: true }
         );
 
