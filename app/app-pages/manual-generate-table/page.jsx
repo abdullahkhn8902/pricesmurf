@@ -123,7 +123,7 @@ function ManualGenerateTableContent({ isPriceList }) {
                     Creating Price List
                 </div>
             )}
-            <div className="max-w-6xl w-full space-y-8">
+            <div className="max-w-6xl w-full space-y-8 mt-20">
                 <div className="text-center">
                     <h1 className="text-3xl sm:text-4xl font-bold text-indigo-900">
                         ✍️ Manual Table Builder
