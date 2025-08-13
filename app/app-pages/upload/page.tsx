@@ -25,6 +25,8 @@ interface SessionMetadata {
     customPrompt: string;
     newTableName: string;
     isReadOnly: boolean;
+    category?: string;
+    subcategory?: string;
 }
 
 function generateSessionId() {
@@ -37,14 +39,30 @@ function getErrorMessage(error: unknown): string {
     return "An unknown error occurred";
 }
 
-// Component that uses useSearchParams
+// Predefined base subcategories (fallback when /api/subcategories doesn't return custom ones)
+const BASE_SUBCATS: Record<string, string[]> = {
+    "Company Tables": ["Products", "Customers"],
+    "Parameters": ["Pricing Parameters", "Tax Rates"],
+    "Transactions": ["Historical Transactions"],
+    "Other Tables": ["Uncategorized"],
+    "Price Lists": ["General"],
+};
+
+const CATEGORY_OPTIONS = [
+    "Company Tables",
+    "Parameters",
+    "Transactions",
+    "Other Tables",
+    // keep Price Lists as internal category (for price-list flows)
+    "Price Lists"
+];
+
 function FileUploadDemoWithParams() {
     const searchParams = useSearchParams();
     const isPriceList = searchParams.get('purpose') === 'price-list';
     return <FileUploadDemoContent isPriceList={isPriceList} />;
 }
 
-// Main component content
 function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
     const [isReadOnly, setIsReadOnly] = useState(false);
     const [files, setFiles] = useState<File[]>([]);
@@ -62,11 +80,51 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
     const [uploadedFileIds, setUploadedFileIds] = useState<string[]>([]);
     const [newTableName, setNewTableName] = useState(""); // New state for table name
 
+    // Manual category states
+    const [selectedCategory, setSelectedCategory] = useState<string | "">("");
+    const [selectedSubcategory, setSelectedSubcategory] = useState<string | "">("");
+    const [availableSubcategories, setAvailableSubcategories] = useState<string[]>([]);
+
     useEffect(() => {
         if (files.length < 2 && combineData) {
             setCombineData(false);
         }
     }, [files, combineData]);
+
+    useEffect(() => {
+        // When category changes, load either custom subcategories or fallback base ones
+        async function fetchSubcats() {
+            if (!selectedCategory) {
+                setAvailableSubcategories([]);
+                setSelectedSubcategory("");
+                return;
+            }
+
+            try {
+                const res = await fetch("/api/subcategories");
+                if (res.ok) {
+                    const subs = await res.json(); // expected: array of { category, subcategory }
+                    const filtered = subs
+                        .filter((s: any) => s.category === selectedCategory)
+                        .map((s: any) => s.subcategory);
+                    if (filtered.length > 0) {
+                        setAvailableSubcategories(filtered);
+                        setSelectedSubcategory((prev) => (filtered.includes(prev) ? prev : filtered[0]));
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to fetch custom subcategories", err);
+            }
+
+            // Fallback to base list
+            const fallback = BASE_SUBCATS[selectedCategory] || [];
+            setAvailableSubcategories(fallback);
+            setSelectedSubcategory(fallback[0] || "");
+        }
+
+        fetchSubcats();
+    }, [selectedCategory]);
 
     const handleFilesChange = (newFiles: File[]) => {
         setFiles((prev) => [
@@ -212,7 +270,9 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
             joinType: selectedJoin,
             isReadOnly,
             customPrompt: customPromptEnabled ? customPrompt : "",
-            newTableName: newTableName.trim() // Add to metadata
+            newTableName: newTableName.trim(), // Add to metadata
+            category: selectedCategory || undefined,
+            subcategory: selectedSubcategory || undefined,
         };
 
         try {
@@ -224,6 +284,31 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
 
             if (res.ok) {
                 setMetadataSaved(true);
+
+                // If user selected a manual category, immediately persist to uploaded files (override AI)
+                if (selectedCategory && uploadedFileIds.length > 0) {
+                    try {
+                        const updateRes = await fetch("/api/update-category", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            credentials: "include",
+                            body: JSON.stringify({
+                                fileIds: uploadedFileIds,
+                                category: selectedCategory,
+                                subcategory: selectedSubcategory || (BASE_SUBCATS[selectedCategory]?.[0] ?? "")
+                            })
+                        });
+
+                        if (!updateRes.ok) {
+                            const err = await updateRes.json().catch(() => null);
+                            console.error("Failed to update category for files:", err);
+                            alert("Saved session but failed to update file category. Check console.");
+                        }
+                    } catch (err) {
+                        console.error("Update-category call failed:", err);
+                    }
+                }
+
                 return true;
             } else {
                 const errorData = await res.json();
@@ -392,6 +477,8 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
                                             </label>
                                         </div>
 
+
+
                                         <div className="mt-4 flex items-center gap-2">
                                             <input
                                                 type="checkbox"
@@ -429,6 +516,47 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
                                                 />
                                             </div>
                                         )}
+                                        {/* New Manual Category Section */}
+                                        <div className="mt-6 border rounded p-4 bg-gray-50 text-indigo-900">
+                                            <p className="text-sm font-medium text-gray-700 mb-2">
+                                                Manually choose category (optional)
+                                            </p>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="block text-xs text-gray-600 mb-1">Category</label>
+                                                    <select
+                                                        value={selectedCategory}
+                                                        onChange={(e) => setSelectedCategory(e.target.value)}
+                                                        className="w-full rounded border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                    >
+                                                        <option value="">(Keep AI choice)</option>
+                                                        {CATEGORY_OPTIONS.map((c) => (
+                                                            <option key={c} value={c}>
+                                                                {c}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-xs text-gray-600 mb-1">Subcategory</label>
+                                                    <select
+                                                        value={selectedSubcategory}
+                                                        onChange={(e) => setSelectedSubcategory(e.target.value)}
+                                                        disabled={!selectedCategory || availableSubcategories.length === 0}
+                                                        className="w-full rounded border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
+                                                    >
+                                                        <option value="">{selectedCategory ? "(Select subcategory)" : "(N/A)"}</option>
+                                                        {availableSubcategories.map((s) => (
+                                                            <option key={s} value={s}>
+                                                                {s}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                        </div>
 
                                     </ModalContent>
                                     <ModalFooter className="gap-4">
@@ -475,7 +603,6 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
     );
 }
 
-// Default export with Suspense boundary
 export default function FileUploadDemo() {
     return (
         <Suspense fallback={

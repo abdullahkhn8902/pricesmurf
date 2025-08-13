@@ -48,7 +48,6 @@ export async function POST(request) {
                 uploadedAt: uploadDate,
                 sessionId,
                 isReadOnly,
-                // ADDED: Store pricing list flag in metadata
                 isPriceList
             }
         });

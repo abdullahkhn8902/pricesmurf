@@ -13,6 +13,7 @@ function ManualGenerateTableContent({ isPriceList }) {
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState("Saving...");
+    const [fileName, setFileName] = useState(""); // New state for file name
     const router = useRouter();
 
     const addColumn = () => setColumns([...columns, ""]);
@@ -58,7 +59,10 @@ function ManualGenerateTableContent({ isPriceList }) {
             alert("Add at least one column before saving!");
             return;
         }
-
+        if (!fileName.trim()) {
+            alert("Please enter a file name");
+            return;
+        }
         setLoading(true);
         setLoadingMessage("Saving...");
 
@@ -77,7 +81,7 @@ function ManualGenerateTableContent({ isPriceList }) {
 
             // Create a File from CSV string
             const blob = new Blob([csvContent], { type: "text/csv" });
-            const file = new File([blob], `manual-table-${Date.now()}.csv`, {
+            const file = new File([blob], `${fileName.trim()}.csv`, {
                 type: "text/csv",
             });
 
@@ -128,7 +132,19 @@ function ManualGenerateTableContent({ isPriceList }) {
                         Add columns and rows to build your custom table.
                     </p>
                 </div>
-
+                <div className="bg-gray-50 p-6 rounded-xl shadow">
+                    <h2 className="text-xl font-semibold text-indigo-900 mb-4">📄 File Details</h2>
+                    <div className="flex items-center gap-4">
+                        <label className="text-indigo-900 font-medium min-w-[100px]">File Name:</label>
+                        <input
+                            type="text"
+                            placeholder="Enter file name"
+                            value={fileName}
+                            onChange={(e) => setFileName(e.target.value)}
+                            className="flex-1 border border-gray-300 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-indigo-900 text-indigo-900"
+                        />
+                    </div>
+                </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     {/* Columns */}
                     <div className="bg-gray-50 p-6 rounded-xl shadow">

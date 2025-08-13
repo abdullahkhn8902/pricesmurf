@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, Suspense } from 'react'
 import { Sidebar, SidebarBody, SidebarLink } from "@/component-app/ui/sidebar";
 import Modal from "@/component-app/ui/Modal";
 import { IconPencil } from "@tabler/icons-react";
+import { IconFolderFilled } from "@tabler/icons-react";
 import {
     IconBrandTabler,
     IconFolder,
@@ -27,6 +28,8 @@ import "ldrs/react/Hourglass.css";
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { IconChevronDown, IconChevronRight } from "@tabler/icons-react";
+import { IconFileOff } from "@tabler/icons-react";
 
 // Register Hourglass component
 
@@ -34,7 +37,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 function SidebarContent() {
     const [newSubcategoryModal, setNewSubcategoryModal] = useState({ open: false, category: '' });
     const [newSubcategoryName, setNewSubcategoryName] = useState('');
-
+    const [expandedSubcategories, setExpandedSubcategories] = useState({});
     const router = useRouter();
     const searchParams = useSearchParams();
     const pathname = usePathname();
@@ -72,11 +75,19 @@ function SidebarContent() {
             });
         }
 
-        const fileId = searchParams.get('file');
-        if (fileId) setSelectedFile(fileId);
     }, [open]);
-
-
+    useEffect(() => {
+        const fileId = searchParams.get('file');
+        if (fileId) {
+            setSelectedFile(fileId);
+        }
+    }, [searchParams]);
+    const toggleSubcategory = (category, subcategory) => {
+        setExpandedSubcategories(prev => ({
+            ...prev,
+            [`${category}-${subcategory}`]: !prev[`${category}-${subcategory}`]
+        }));
+    };
 
     const fetchSidebarData = async () => {
         try {
@@ -102,14 +113,14 @@ function SidebarContent() {
             // Initialize organizedData with predefined structure
             const organizedData = {
                 'Company Tables': {
-                    icon: <FaBuilding className="h-5 w-5 shrink-0 text-white" />,
+                    icon: <FaBuilding className="h-5 w-5 shrink-0 text-white " />,
                     subcategories: {
                         'Products': { files: [] },
                         'Customers': { files: [] },
                     }
                 },
                 'Parameters': {
-                    icon: <FaChartLine className="h-5 w-5 shrink-0 text-white" />,
+                    icon: <FaChartLine className="h-5 w-5 shrink-0 text-white " />,
                     subcategories: {
                         'Pricing Parameters': { files: [] },
                         'Tax Rates': { files: [] },
@@ -117,20 +128,20 @@ function SidebarContent() {
                     }
                 },
                 'Transactions': {
-                    icon: <FaExchangeAlt className="h-5 w-5 shrink-0 text-white" />,
+                    icon: <FaExchangeAlt className="h-5 w-5 shrink-0 text-white " />,
                     subcategories: {
                         'Historical Transactions': { files: [] },
                         'Other Transactions': { files: [] }
                     }
                 },
                 'Other Tables': {
-                    icon: <IconFolder className="h-5 w-5 shrink-0 text-white" />,
+                    icon: <IconFolder className="h-5 w-5 shrink-0 text-white " />,
                     subcategories: {
                         'Uncategorized': { files: [] }
                     }
                 },
                 'Price Lists': {
-                    icon: <IconCurrencyDollar className="h-5 w-5 shrink-0 text-white" />,
+                    icon: <IconCurrencyDollar className="h-5 w-5 shrink-0 text-white " />,
                     files: []
                 }
             };
@@ -273,9 +284,9 @@ function SidebarContent() {
                                 </div>
                             ) : (
                                 Object.entries(sidebarData).map(([category, categoryData]) => (
-                                    <div key={category} className="flex flex-col">
+                                    <div key={category} className="flex flex-col ">
                                         <button
-                                            className="flex items-center gap-2 py-2 text-white hover:bg-neutral-700 rounded"
+                                            className="flex items-center gap-2 py-2 text-blue-200  rounded"
                                             onClick={() => toggleCategory(category)}
                                         >
                                             {categoryData.icon}
@@ -284,7 +295,7 @@ function SidebarContent() {
                                                     display: open ? "inline-block" : "none",
                                                     opacity: open ? 1 : 0,
                                                 }}
-                                                className="text-white text-sm"
+                                                className="text-white text-md "
                                             >
                                                 {category}
                                             </motion.span>
@@ -295,7 +306,11 @@ function SidebarContent() {
                                                     opacity: open ? 1 : 0,
                                                 }}
                                             >
-                                                {expandedCategories[category] ? '▼' : '►'}
+                                                {expandedCategories[category] ? (
+                                                    <IconChevronDown className="h-4 w-4" />
+                                                ) : (
+                                                    <IconChevronRight className="h-4 w-4" />
+                                                )}
                                             </motion.span>
                                         </button>
 
@@ -343,43 +358,81 @@ function SidebarContent() {
 
                                                         {Object.entries(categoryData.subcategories).map(([subcategory, subData]) => (
                                                             <div key={subcategory} className="mt-1">
-                                                                <div className="flex items-center py-1 text-white">
-                                                                    <IconFile className="h-4 w-4 mr-2" />
+                                                                <button
+                                                                    className="flex items-center w-full py-1 text-white hover:bg-neutral-700 rounded group"
+                                                                    onClick={() => toggleSubcategory(category, subcategory)}
+                                                                >
+                                                                    <IconFolderFilled className="h-4 w-4 mr-2 text-yellow-400" />
                                                                     <motion.span
                                                                         animate={{
                                                                             display: open ? "inline-block" : "none",
                                                                             opacity: open ? 1 : 0,
                                                                         }}
-                                                                        className="text-xs"
+                                                                        className="text-xs flex-1 text-left"
                                                                     >
                                                                         {subcategory}
                                                                     </motion.span>
-                                                                </div>
-                                                                <div className="pl-6">
-                                                                    {subData.files.map(file => (
-                                                                        <button
-                                                                            key={file.id}
-                                                                            onClick={() => handleFileSelect(file.id, category, subcategory)}
-                                                                            className={cn(
-                                                                                "block py-1 text-white text-xs truncate hover:underline w-full text-left",
-                                                                                selectedFile === file.id && "bg-blue-500 rounded px-2"
-                                                                            )}
-                                                                            title={file.filename}
-                                                                        >
-                                                                            <motion.span
-                                                                                animate={{
-                                                                                    display: open ? "inline-block" : "none",
-                                                                                    opacity: open ? 1 : 0,
-                                                                                }}
-                                                                            >
-                                                                                {file.filename}
-                                                                                {file.readOnly && " (RO)"}
-                                                                            </motion.span>
-                                                                        </button>
-                                                                    ))}
-                                                                </div>
+                                                                    <motion.span
+                                                                        className="ml-auto transition-transform duration-200 group-hover:scale-110"
+                                                                        animate={{
+                                                                            display: open ? "inline-block" : "none",
+                                                                            opacity: open ? 1 : 0,
+                                                                        }}
+                                                                    >
+                                                                        {expandedCategories[category] ? (
+                                                                            <IconChevronDown className="h-4 w-4 text-blue-300" />
+                                                                        ) : (
+                                                                            <IconChevronRight className="h-4 w-4 text-blue-300" />
+                                                                        )}
+                                                                    </motion.span>
+                                                                </button>
+
+                                                                {expandedSubcategories[`${category}-${subcategory}`] && (
+                                                                    <div className="pl-6 border-l-2 border-blue-400 ml-2 my-1">
+                                                                        {subData.files.length > 0 ? (
+                                                                            subData.files.map(file => (
+                                                                                <button
+                                                                                    key={file.id}
+                                                                                    onClick={() => handleFileSelect(file.id, category, subcategory)}
+                                                                                    className={cn(
+                                                                                        "flex items-center py-1 text-white text-xs w-full text-left hover:underline",
+                                                                                        selectedFile === file.id && "bg-blue-500 rounded px-2"
+                                                                                    )}
+                                                                                    title={file.filename}
+                                                                                >
+                                                                                    <IconFile className="h-3 w-3 mr-2 text-gray-300" />
+                                                                                    <motion.span
+                                                                                        className="truncate"
+                                                                                        animate={{
+                                                                                            display: open ? "inline-block" : "none",
+                                                                                            opacity: open ? 1 : 0,
+                                                                                        }}
+                                                                                    >
+                                                                                        {file.filename}
+                                                                                        {file.readOnly && " (RO)"}
+                                                                                    </motion.span>
+                                                                                </button>
+                                                                            ))
+                                                                        ) : (
+                                                                            <div className="flex items-center py-1 text-gray-400 italic text-xs">
+                                                                                <IconFileOff className="h-3 w-3 mr-2" />
+                                                                                <motion.span
+                                                                                    animate={{
+                                                                                        display: open ? "inline-block" : "none",
+                                                                                        opacity: open ? 1 : 0,
+                                                                                    }}
+                                                                                >
+                                                                                    No tables
+                                                                                </motion.span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+
                                                             </div>
                                                         ))}
+
+
                                                     </>
                                                 )}
                                             </div>
@@ -453,7 +506,7 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
     const searchParams = useSearchParams();
     const [isEditingFileName, setIsEditingFileName] = useState(false);
     const [newFileName, setNewFileName] = useState('');
-
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isClient, setIsClient] = useState(false);
     const [files, setFiles] = useState([]);
     const [selectedFileId, setSelectedFileId] = useState('');
@@ -479,6 +532,28 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
     const [newRowData, setNewRowData] = useState({});
     const [columnDefaultValue, setColumnDefaultValue] = useState('');
     const [newColumnRowValues, setNewColumnRowValues] = useState({});
+
+    // Category UI states
+    const [showCategoryModal, setShowCategoryModal] = useState(false);
+    const [categoryOptions] = useState([
+        "Company Tables",
+        "Parameters",
+        "Transactions",
+        "Other Tables",
+        "Price Lists"
+    ]);
+    const BASE_SUBCATS = {
+        "Company Tables": ["Products", "Customers"],
+        "Parameters": ["Pricing Parameters", "Tax Rates"],
+        "Transactions": ["Historical Transactions"],
+        "Other Tables": ["Uncategorized"],
+        "Price Lists": ["General"]
+    };
+    const [selectedCategory, setSelectedCategory] = useState('');
+    const [selectedSubcategory, setSelectedSubcategory] = useState('');
+    const [availableSubcategories, setAvailableSubcategories] = useState([]);
+    const [categoryLoading, setCategoryLoading] = useState(false);
+    const [categoryError, setCategoryError] = useState('');
 
     const sanitizeColumnName = (name) => {
         return (name || '').toString().replace(/[^a-zA-Z0-9\s_-]/g, '').trim() || 'Unnamed';
@@ -552,6 +627,45 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
             setIsReadOnly(selectedFile?.readOnly || false);
         }
     }, [selectedFileId, files]);
+
+    // When category changes, load subcategories (try /api/subcategories then fallback)
+    useEffect(() => {
+        if (!selectedCategory) {
+            setAvailableSubcategories([]);
+            setSelectedSubcategory('');
+            return;
+        }
+
+        let cancelled = false;
+        async function loadSubs() {
+            setCategoryLoading(true);
+            setCategoryError('');
+            try {
+                const res = await fetch('/api/subcategories');
+                if (res.ok) {
+                    const subs = await res.json(); // expected array of {category, subcategory}
+                    const filtered = subs.filter(s => s.category === selectedCategory).map(s => s.subcategory);
+                    if (!cancelled && filtered.length > 0) {
+                        setAvailableSubcategories(filtered);
+                        setSelectedSubcategory(filtered[0] || '');
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to fetch custom subcategories', e);
+            }
+
+            // fallback
+            const fallback = BASE_SUBCATS[selectedCategory] || [];
+            if (!cancelled) {
+                setAvailableSubcategories(fallback);
+                setSelectedSubcategory(fallback[0] || '');
+            }
+            setCategoryLoading(false);
+        }
+        loadSubs();
+        return () => { cancelled = true; };
+    }, [selectedCategory]);
 
     const handleEdit = (index) => {
         setEditingIndex(index);
@@ -702,7 +816,6 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
 
 
 
-
     const handleRemoveColumn = (columnName) => {
         if (columns.length <= 1) {
             setError('Cannot remove the last column');
@@ -822,6 +935,73 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
         }));
     };
 
+    // Open category modal and prefill with current file category
+    const openCategoryModal = () => {
+        setCategoryError('');
+        const currentFile = files.find(f => f.id === selectedFileId);
+        const curCat = currentFile?.category || '';
+        const curSub = currentFile?.subcategory || '';
+        setSelectedCategory(curCat);
+        setSelectedSubcategory(curSub);
+        // availableSubcategories will be populated by effect watching selectedCategory
+        setShowCategoryModal(true);
+    };
+
+    const handleSaveCategory = async () => {
+        if (!selectedFileId) {
+            setCategoryError('No file selected');
+            return;
+        }
+        if (!selectedCategory) {
+            setCategoryError('Please select a category');
+            return;
+        }
+
+        setCategoryLoading(true);
+        setCategoryError('');
+        try {
+            const res = await fetch('/api/update-category', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    fileIds: [selectedFileId],
+                    category: selectedCategory,
+                    subcategory: selectedSubcategory || (availableSubcategories[0] || 'General')
+                })
+            });
+
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || 'Failed to update category');
+
+            // update local files state (optimistic)
+            setFiles(prev => prev.map(f => f.id === selectedFileId ? {
+                ...f,
+                category: selectedCategory,
+                subcategory: selectedSubcategory || (availableSubcategories[0] || 'General'),
+                manualCategoryOverride: true
+            } : f));
+
+            // also refresh file details (optional) to reflect new category in UI
+            try {
+                const refreshed = await fetch(`/api/files?id=${selectedFileId}`);
+                if (refreshed.ok) {
+                    const details = await refreshed.json();
+                    setSheetName(details.sheetName || sheetName);
+                    // keep columns/data as they are; metadata updated above
+                }
+            } catch (e) {
+                console.warn('Could not refresh file details after category update', e);
+            }
+
+            setShowCategoryModal(false);
+            setCategoryLoading(false);
+        } catch (err) {
+            console.error('Failed to save category:', err);
+            setCategoryError(err.message || 'Failed to update category');
+            setCategoryLoading(false);
+        }
+    };
 
     return (
         <div className="flex flex-1">
@@ -906,6 +1086,14 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
                             Custom Analyze
                         </button>
 
+                        {/* New Change Category button */}
+                        <button
+                            onClick={openCategoryModal}
+                            className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+                        >
+                            Change Category
+                        </button>
+
                         <button
                             onClick={() => setShowTransformModal(true)}
                             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -922,6 +1110,65 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
                         </button>
                     </div>
                 </div>
+
+                {/* Category Modal */}
+                {showCategoryModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-white p-6 rounded-lg w-full max-w-md">
+                            <h3 className="text-lg font-semibold mb-4 dark:text-black">Change File Category</h3>
+
+                            {categoryError && <div className="text-red-500 mb-2">{categoryError}</div>}
+
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                                <select
+                                    value={selectedCategory}
+                                    onChange={(e) => setSelectedCategory(e.target.value)}
+                                    className="w-full rounded border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                >
+                                    <option value="">(Choose category)</option>
+                                    {categoryOptions.map(cat => (
+                                        <option key={cat} value={cat}>{cat}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Subcategory</label>
+                                <select
+                                    value={selectedSubcategory}
+                                    onChange={(e) => setSelectedSubcategory(e.target.value)}
+                                    disabled={!selectedCategory || availableSubcategories.length === 0}
+                                    className="w-full rounded border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
+                                >
+                                    <option value="">{selectedCategory ? "(Select subcategory)" : "(N/A)"}</option>
+                                    {availableSubcategories.map(s => (
+                                        <option key={s} value={s}>{s}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex justify-end gap-2">
+                                <button
+                                    onClick={() => {
+                                        setShowCategoryModal(false);
+                                        setCategoryError('');
+                                    }}
+                                    className="px-4 py-2 bg-gray-300 rounded-lg"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleSaveCategory}
+                                    disabled={categoryLoading}
+                                    className="px-4 py-2 bg-orange-500 text-white rounded-lg disabled:opacity-50"
+                                >
+                                    {categoryLoading ? 'Saving...' : 'Save Category'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {showCustomPromptModal && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
