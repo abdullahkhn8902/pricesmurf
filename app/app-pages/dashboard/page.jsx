@@ -4,6 +4,8 @@ import { Sidebar, SidebarBody, SidebarLink } from "@/component-app/ui/sidebar";
 import Modal from "@/component-app/ui/Modal";
 import { IconPencil } from "@tabler/icons-react";
 import { IconFolderFilled } from "@tabler/icons-react";
+import { IconMaximize, IconMinimize } from "@tabler/icons-react";
+
 import {
     IconBrandTabler,
     IconFolder,
@@ -509,6 +511,7 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isClient, setIsClient] = useState(false);
     const [files, setFiles] = useState([]);
+
     const [selectedFileId, setSelectedFileId] = useState('');
     const [sheetName, setSheetName] = useState('Sheet# 1');
     const [columns, setColumns] = useState([]);
@@ -1004,7 +1007,7 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
     };
 
     return (
-        <div className="flex flex-1">
+        <div className="flex flex-1 ">
             <div className="flex w-full flex-1 flex-col gap-2 rounded-tl-2xl border border-neutral-200 bg-gray-200 p-2 md:p-10">
                 <div className="flex justify-between items-center mt-2 px-4">
                     <div className="flex items-center justify-center w-full">
@@ -1124,7 +1127,7 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
                                 <select
                                     value={selectedCategory}
                                     onChange={(e) => setSelectedCategory(e.target.value)}
-                                    className="w-full rounded border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    className="w-full rounded border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2  text-indigo-900"
                                 >
                                     <option value="">(Choose category)</option>
                                     {categoryOptions.map(cat => (
@@ -1139,7 +1142,7 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
                                     value={selectedSubcategory}
                                     onChange={(e) => setSelectedSubcategory(e.target.value)}
                                     disabled={!selectedCategory || availableSubcategories.length === 0}
-                                    className="w-full rounded border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
+                                    className="w-full rounded border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2  disabled:opacity-60 text-indigo-900"
                                 >
                                     <option value="">{selectedCategory ? "(Select subcategory)" : "(N/A)"}</option>
                                     {availableSubcategories.map(s => (
@@ -1154,7 +1157,7 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
                                         setShowCategoryModal(false);
                                         setCategoryError('');
                                     }}
-                                    className="px-4 py-2 bg-gray-300 rounded-lg"
+                                    className="px-4 py-2 bg-gray-500 text-white rounded-lg"
                                 >
                                     Cancel
                                 </button>
@@ -1341,7 +1344,7 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
                             <h3 className="text-lg font-semibold mb-4 dark:text-black">
                                 Confirm Column Removal
                             </h3>
-                            <p className="mb-4">
+                            <p className="mb-4 text-indigo-900">
                                 Are you sure you want to remove the column: <strong>{columnToRemove}</strong>?
                                 This action cannot be undone.
                             </p>
@@ -1365,20 +1368,19 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
                 )}
 
                 {analysis && (
-                    <div className="mt-4 max-h-[100vh] overflow-y-auto bg-white p-4 rounded-lg shadow-md relative z-10">
-                        <h3 className="text-lg font-semibold mb-2 text-indigo-900">PriceSmurf AI</h3>
-                        <div className="whitespace-pre-line text-gray-700">
+                    <div className="mt-4 w-full bg-white p-6 rounded-lg shadow-lg relative z-10">
+                        <h3 className="text-xl font-semibold mb-4 text-indigo-900">PriceSmurf AI</h3>
+                        <div className="whitespace-pre-line text-gray-700 text-base leading-relaxed max-h-[200px] overflow-y-auto">
                             {analysis}
                         </div>
                         <button
                             onClick={() => setAnalysis('')}
-                            className="mt-2 text-red-600 hover:text-red-700"
+                            className="mt-4 text-red-600 hover:text-red-700 font-medium"
                         >
                             Close Analysis
                         </button>
                     </div>
                 )}
-
                 <div className="mx-auto w-full md:w-[40rem] lg:w-[55rem] xl:w-[80rem] mt-4">
                     <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-indigo-900">Select File</label>
