@@ -27,8 +27,11 @@ export async function POST(request) {
         const file = formData.get('file');
         const sessionId = formData.get('sessionId');
         const isReadOnly = formData.get('isReadOnly') === 'true';
-        // ADDED: Get pricing list flag
         const isPriceList = formData.get('isPriceList') === 'true';
+
+        // ADDED: Get category and subcategory from form data
+        const category = formData.get('category');
+        const subcategory = formData.get('subcategory');
 
         if (!file) {
             return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
@@ -48,7 +51,10 @@ export async function POST(request) {
                 uploadedAt: uploadDate,
                 sessionId,
                 isReadOnly,
-                isPriceList
+                isPriceList,
+                // ADDED: Store category/subcategory in metadata
+                category,
+                subcategory
             }
         });
         uploadStream.write(buffer);
@@ -65,8 +71,9 @@ export async function POST(request) {
                 fileId,
                 filename: file.name,
                 sessionId,
-                // ADDED: Return pricing list status
-                isPriceList
+                isPriceList,
+                category,
+                subcategory
             },
             { status: 200 }
         );
