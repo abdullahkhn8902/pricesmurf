@@ -58,6 +58,8 @@ function SidebarContent() {
     const [selectedFile, setSelectedFile] = useState(null);
     const [lastFetchTime, setLastFetchTime] = useState(0);
     const initialLoadRef = useRef(true);
+    const currentFetchRef = useRef(null);
+
 
     useEffect(() => {
         setIsClient(true);
@@ -76,6 +78,12 @@ function SidebarContent() {
                 'Price Lists': false
             });
         }
+        return () => {
+            if (currentFetchRef.current) {
+                currentFetchRef.current.abort();
+            }
+        };
+
 
     }, [open]);
     useEffect(() => {
@@ -92,16 +100,31 @@ function SidebarContent() {
     };
 
     const fetchSidebarData = async () => {
+        if (currentFetchRef.current) {
+            currentFetchRef.current.abort();
+        }
+
+        const abortController = new AbortController();
+        currentFetchRef.current = abortController;
+
+
         try {
             // Fetch files
-            const res = await fetch('/api/files?metadata=1');
+            const res = await fetch('/api/files?metadata=1', {
+                signal: abortController.signal,
+            });
+
+            // Check if aborted before processing
+            if (abortController.signal.aborted) return;
             if (!res.ok) throw new Error('Failed to fetch files');
             const files = await res.json();
 
             // Fetch custom subcategories
             let customSubs = [];
             try {
-                const customRes = await fetch('/api/subcategories');
+                const customRes = await fetch('/api/subcategories', {
+                    signal: abortController.signal,
+                });
                 if (customRes.ok) {
                     customSubs = await customRes.json();
                     console.log('Fetched custom subcategories:', customSubs);
@@ -205,7 +228,10 @@ function SidebarContent() {
         } catch (err) {
             console.error('Error fetching sidebar data:', err);
         } finally {
-            setLoading(false);
+            if (!abortController.signal.aborted) {
+                setLoading(false);
+                currentFetchRef.current = null;
+            }
         }
     };
 
