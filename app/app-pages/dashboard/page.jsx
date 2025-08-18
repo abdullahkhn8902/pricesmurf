@@ -62,13 +62,10 @@ function SidebarContent() {
   useEffect(() => {
     setIsClient(true);
 
-    if (initialLoadRef.current) {
+    if (initialLoadRef.current || open) {
       fetchSidebarData();
       initialLoadRef.current = false;
     }
-    // if (open) {
-    //   fetchSidebarData();
-    // }
 
     if (!open) {
       setExpandedCategories({
@@ -592,6 +589,7 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
   }, [propSelectedFileId]);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchFileData = async () => {
       if (!selectedFileId) return;
 
@@ -601,31 +599,27 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
         if (!res.ok) throw new Error('Failed to fetch file data');
         const { sheetName, columns, data, analysis, isReadOnly: roFlag } = await res.json();
 
-        setSheetName(sheetName || 'Sheets');
-        setColumns((columns || []).map(sanitizeColumnName));
-        setData(data || []);
-        setAnalysis(analysis || '');
-        setIsReadOnly(roFlag);
+        if (isMounted) {
+          setSheetName(sheetName || 'Sheets');
+          setColumns((columns || []).map(sanitizeColumnName));
+          setData(data || []);
+          setAnalysis(analysis || '');
+          setIsReadOnly(roFlag);
+        }
 
         setError('');
       } catch (err) {
         setError('Error fetching file data. Please try again.');
         console.error('Error:', err);
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
 
     fetchFileData();
+    return () => { isMounted = false };
   }, [selectedFileId]);
 
-  useEffect(() => {
-    if (selectedFileId) {
-      const params = new URLSearchParams(searchParams);
-      params.set('file', selectedFileId);
-      router.replace(`${pathname}?${params.toString()}`);
-    }
-  }, [selectedFileId, pathname, router, searchParams]);
 
   useEffect(() => {
     if (selectedFileId && files.length > 0) {
