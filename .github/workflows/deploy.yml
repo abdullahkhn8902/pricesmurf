@@ -5,8 +5,8 @@ on:
     branches: [ "master" ]
 
 permissions:
-  contents: read           # default, allows checkout
-  id-token: write          # REQUIRED for OIDC
+  contents: read
+  id-token: write
 
 jobs:
   build-and-deploy:
@@ -14,6 +14,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22
 
       - name: Authenticate to GCP via OIDC
         uses: google-github-actions/auth@v1
@@ -30,5 +35,8 @@ jobs:
 
       - name: Deploy to Cloud Run
         run: |
-          gcloud config set project neural-land-469712-t7
-          gcloud run deploy pricesmurf --source . --region us-central1 --allow-unauthenticated --project neural-land-469712-t7
+          gcloud run deploy pricesmurf \
+            --source . \
+            --region us-central1 \
+            --allow-unauthenticated \
+            --image us-central1-docker.pkg.dev/neural-land-469712-t7/pricesmurf-repo/pricesmurf:latest

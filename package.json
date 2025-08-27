@@ -10,7 +10,7 @@
     "gcp-build": "npm install && npm run build"
   },
   "engines": {
-    "node": "20.x"
+    "node": ">=22"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.25.4",
