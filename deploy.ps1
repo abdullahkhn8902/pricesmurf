@@ -1,10 +1,9 @@
 # ---------- CONFIG ----------
-$project = "clear-beacon-469418-k8"
-$region = "us-central"
+$project = "neural-land-469712-t7"
+$region = "asia-south1"
+$serviceName = "pricesmurf"
 $serviceAccountName = "nextjs-app-sa"
 $serviceAccountEmail = "$serviceAccountName@$project.iam.gserviceaccount.com"
-$version = "v1"   # Change version for new deploy
-$appYamlPath = ".\app.yaml"
 $secrets = @(
     "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
     "CLERK_SECRET_KEY",
@@ -31,42 +30,24 @@ foreach ($s in $secrets) {
         --project=$project
 }
 
-# 4️⃣ Grant roles for App Engine and Cloud Storage
+# 4️⃣ Grant required roles for Cloud Run
 gcloud projects add-iam-policy-binding $project `
     --member="serviceAccount:$serviceAccountEmail" `
-    --role="roles/appengine.deployer"
+    --role="roles/run.admin"
 
-# Ensure SA has storage access for Cloud Build
-$bucket = "staging.$project.appspot.com"
-gcloud storage buckets add-iam-policy-binding "gs://$bucket" `
+gcloud projects add-iam-policy-binding $project `
     --member="serviceAccount:$serviceAccountEmail" `
-    --role="roles/storage.objectAdmin"
+    --role="roles/storage.admin"
 
-# 5️⃣ Ensure App Engine exists
-$appCheck = gcloud app describe --project=$project 2>$null
-if (-not $appCheck) {
-    Write-Host "Creating App Engine in region $region..."
-    gcloud app create --region=$region
-}
+# 5️⃣ Deploy to Cloud Run using Buildpacks
+Write-Host "Deploying Next.js app to Cloud Run..."
+gcloud run deploy $serviceName `
+    --source . `
+    --region=$region `
+    --allow-unauthenticated `
+    --service-account=$serviceAccountEmail
 
-# 6️⃣ Update app.yaml to use service account
-if (-Not (Test-Path $appYamlPath)) {
-    Write-Host "app.yaml not found! Please create one with runtime nodejs20."
-} else {
-    $yamlContent = Get-Content $appYamlPath
-    if ($yamlContent -notmatch "service_account:") {
-        Add-Content -Path $appYamlPath -Value "`nservice_account: $serviceAccountEmail"
-        Write-Host "Added service_account to app.yaml"
-    } else {
-        Write-Host "app.yaml already has service_account"
-    }
-}
-
-# 7️⃣ Deploy the app
-Write-Host "Deploying Next.js app..."
-gcloud app deploy $appYamlPath --quiet --service-account=$serviceAccountEmail --version=$version
-
-# 8️⃣ Open app in browser
-gcloud app browse --project=$project
+# 6️⃣ Open deployed app
+gcloud run services describe $serviceName --region=$region --format="value(status.url)"
 
 Write-Host "✅ Deployment finished successfully!"

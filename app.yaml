@@ -1,15 +1,12 @@
-entrypoint: npm start
-env: standard
 runtime: nodejs20
-
-
-
+service: default
 instance_class: F2
+entrypoint: npm run start
+env: standard
 
 automatic_scaling:
   min_instances: 0   # pay only when there’s traffic
   max_instances: 2
   target_cpu_utilization: 0.65
 
-
-service_account: nextjs-app-sa@clear-beacon-469418-k8.iam.gserviceaccount.com
+service_account: nextjs-app-sa@neural-land-469712-t7.iam.gserviceaccount.com

@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start -p ${PORT:-8080}"
+    "start": "next start -p $PORT",
+    "gcp-build": "npm install && npm run build"
+  },
+  "engines": {
+    "node": "20.x"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.25.4",

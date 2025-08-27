@@ -1,0 +1,32 @@
+Set-Content -Path .github\workflows\deploy.yml -Value @'
+name: CI/CD — Deploy to Cloud Run
+
+on:
+  push:
+    branches: [ "master" ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP via OIDC
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: access_token
+          workload_identity_provider: projects/641189217314/locations/global/workloadIdentityPools/gha-pool/providers/github-provider
+          service_account: gha-deployer@neural-land-469712-t7.iam.gserviceaccount.com
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: neural-land-469712-t7
+          export_default_credentials: true
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud config set project neural-land-469712-t7
+          gcloud run deploy pricesmurf --source . --region us-central1 --allow-unauthenticated --project neural-land-469712-t7
+'@
