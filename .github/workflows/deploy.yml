@@ -1,4 +1,3 @@
-Set-Content -Path .github\workflows\deploy.yml -Value @'
 name: CI/CD — Deploy to Cloud Run
 
 on:
@@ -29,4 +28,3 @@ jobs:
         run: |
           gcloud config set project neural-land-469712-t7
           gcloud run deploy pricesmurf --source . --region us-central1 --allow-unauthenticated --project neural-land-469712-t7
-'@
