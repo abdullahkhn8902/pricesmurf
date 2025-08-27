@@ -4,6 +4,10 @@ on:
   push:
     branches: [ "master" ]
 
+permissions:
+  contents: read           # default, allows checkout
+  id-token: write          # REQUIRED for OIDC
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
