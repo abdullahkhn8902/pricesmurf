@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "clear-beacon-469418-k8",
+  "private_key_id": "934c009f8baf78405ec8f79415b768d51bc8be9e",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCkCkhAURoWZXLX\nS1c8nTAhgVnb+F4H1zLqzFEUHnUReZyYFj5JjKmrUIzB3Ra3B4mKHM8242TI0d1T\nO3Vh19sCZXBqqDjnYBwqZcpJdOtlsdeNjXwJ5EPvjvARPNkeAYDe9TNlCtf4VYwG\nW77TSf9QJ2QN7ivS77sJC/0r4PVB0IKiMSzO9z1mNYpDO4N7jBIqg6rDR5ivLBZX\nABx2jrSr1PDkLLoEC4Ba42dia1d18Q0P5a+OgqiuMAzOZD64n/WOThGK5nwvVc0p\nmuVkVofjIbsZDZFbQCACMjeCGXDKO74hix8ChygZMloUkKExMu8ZiFAEP5TZDe7u\nmUjRRLhfAgMBAAECggEAQLDBX4PcStrFGDxg8cl3cq8lNcdTpbnrHYdnrgx41GRm\nKeATvkOXobTJXaaHz7RMPEgyO44fb8a7hphbKTPL7bz9QUKH9k8DrICp7qAKOPeS\nbwNN2ETJuc5fxBx/7wJexQ5jr0RAeXGbH+LMdVyoL/7oyUmUxMG/u8ibldNIRSSI\nfY72IJAFGNFP6MISKU0Az2DFAFiReY8OlBi3fiVTfDr6apG82yojtmULrVogS7cx\nfYO4wzB2keEK1cfSY2WG7bvYtsk3Rqfr9myrrCuHEdbW8XfBfjweDfQnhbYh7WsP\nSy/ZP4MS5WNp+ZXjYDQ9aj66R0TAl6QdW/7fdsDZMQKBgQDaKGDBz7fLLpQDRiDO\nQYgV3BXMDQi7qBq0CLXNEnQXD7Pj08WD9alncL0/LDGinNB35Qjx+GRvYzexcb6d\npf/TnBoajg5yCuA2s2zdhQIoz1N5uG03tMdH9cEPIHQ5u/yj0beWMUoM7tPUpjsT\nqai1ZFku8gqDpmAs7Y1QmsANhwKBgQDAfruH71QmwtWrxqLEP8ddWAgPfm8af4AB\nA/Ba6YJRIFRLTY5ueilpOwwYhJ39fpa/7lvzSxV62h01Ar2oVMNueJviwUZS0/zM\nLJPvPV4bGCUi1i8vAisa42IEk1BAdcuuJ4pZuXP/KK6pHpQvEAcN+LJRhHu7dusp\nAdjGYjJ0aQKBgHIX+fqCyym9M3W+4HtedHCSSOgNzQpvsX+EqqgUxZgmAzvczojk\nGvPZV3BJia/0+WYq55G9CbHjnwXzafCDF5exJUnMD6v/GiIhlocIAAgd3hdjp+Mh\nbbOpyI1DuOVU9p0qmiw3nPXElg653V28Nlqfn7DYrz0I73Wvy19jf5vTAoGAVkM0\n1Nj6lBgx2rW8UUfnlrwReKgHMA+9FDdoqcUFAkgDnm9WCcoy7pZoeEBN8MCe28n8\naM3YBWLjPdNJnLrHjaT87qQAWLPpELJVZRvSJUAvvCnRoTZOjNEjJrvBdfGT4iqU\nBFtoUQsxIlayv1hmYOt3NbKyJDNJdOn/8/8jbykCgYEAx79/UDy9t8EiTeegr+Ys\nXnbjeiObKokpPcxmSR0nYAs9JhAQAwPOPevd4ZlajVXxjWdTvKzFljMh2QF+HGhE\n444CE0H3kEAyvduokb5oPgyA15xx9Q9J56omEgjoWSc7SD9gqIBWQnNqwPqAt0YI\nz/74EzGpTvSFejQfeiZ7Edo=\n-----END PRIVATE KEY-----\n",
+  "client_email": "pricesmurf@clear-beacon-469418-k8.iam.gserviceaccount.com",
+  "client_id": "107389926193040724424",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/pricesmurf%40clear-beacon-469418-k8.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
