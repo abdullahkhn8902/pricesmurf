@@ -33,15 +33,17 @@ jobs:
           project_id: neural-land-469712-t7
           export_default_credentials: true
 
-      - name: Install dependencies & build
-        run: |
-          npm ci
-          npm run build
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: neural-land-469712-t7
+          export_default_credentials: true
+        env:
+          CLOUDSDK_CONTAINER_USE_ARTIFACT_REGISTRY: true
 
       - name: Deploy to Cloud Run
-        run: |
-          gcloud run deploy pricesmurf \
-            --source . \
-            --region us-central1 \
-            --allow-unauthenticated \
-            --project neural-land-469712-t7
+      run: |
+        gcloud run deploy pricesmurf \
+          --source . \
+          --region us-central1 \
+          --allow-unauthenticated
