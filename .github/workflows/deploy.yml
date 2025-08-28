@@ -35,5 +35,4 @@ jobs:
 
       - name: Deploy to App Engine
         run: |
-          gcloud run deploy pricesmurf --source . --allow-unauthenticated --region us-central1
-
+          gcloud app deploy app.yaml --project=neural-land-469712-t7 --quiet

@@ -1,39 +1,24 @@
-name: CI/CD — Deploy to Cloud Run
+steps:
+  # Install dependencies
+  - name: "gcr.io/cloud-builders/npm"
+    dir: "frontend"
+    args: ["install"]
 
-on:
-  push:
-    branches: [ "master" ]
+  # Build Next.js app
+  - name: "gcr.io/cloud-builders/npm"
+    dir: "frontend"
+    args: ["run", "build"]
 
-permissions:
-  contents: read
-  id-token: write
+  # Deploy to Cloud Run (using Buildpacks, no Dockerfile needed)
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - pricesmurf-frontend
+      - --source=./frontend
+      - --region=asia-south1
+      - --platform=managed
+      - --allow-unauthenticated
 
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js 22
-        uses: actions/setup-node@v3
-        with:
-          node-version: 22
-
-      - name: Authenticate to GCP with JSON key
-        uses: google-github-actions/auth@v1
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Set up gcloud
-        uses: google-github-actions/setup-gcloud@v1
-        with:
-          project_id: neural-land-469712-t7
-          export_default_credentials: true
-        env:
-          CLOUDSDK_CONTAINER_USE_ARTIFACT_REGISTRY: true
-
-      - name: Deploy to App Engine
-        run: |
-          gcloud run deploy pricesmurf --source . --allow-unauthenticated --region us-central1
-
+timeout: "1200s"
