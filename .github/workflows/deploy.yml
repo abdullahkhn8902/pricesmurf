@@ -20,13 +20,11 @@ jobs:
         with:
           node-version: 22
 
-      - name: Authenticate to GCP via OIDC
+      - name: Authenticate to GCP with JSON key
         uses: google-github-actions/auth@v1
         with:
-          token_format: access_token
-          workload_identity_provider: projects/641189217314/locations/global/workloadIdentityPools/gha-pool/providers/github-provider
-          service_account: gha-deployer@neural-land-469712-t7.iam.gserviceaccount.com
-
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v1
         with:
