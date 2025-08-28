@@ -10,3 +10,10 @@ automatic_scaling:
   target_cpu_utilization: 0.65
 
 service_account: nextjs-app-sa@neural-land-469712-t7.iam.gserviceaccount.com
+
+env_variables:
+  # Reference secrets from Secret Manager
+  CLERK_SECRET_KEY: "projects/neural-land-469712-t7/secrets/CLERK_SECRET_KEY/versions/latest"
+  MONGODB_URI: "projects/neural-land-469712-t7/secrets/MONGODB_URI/versions/latest"
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "projects/neural-land-469712-t7/secrets/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY/versions/latest"
+  OPENROUTER_API_KEY: "projects/neural-land-469712-t7/secrets/OPENROUTER_API_KEY/versions/latest"
