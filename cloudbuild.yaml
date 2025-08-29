@@ -43,20 +43,17 @@ steps:
       export MONGODB_URI=$$_MONGODB_URI
       export OPENROUTER_API_KEY=$$_OPENROUTER_API_KEY
 
-      # Create a temporary deploy YAML by copying the repo app.yaml and appending env_variables.
-      # If your repo's app.yaml already contains env_variables, this simple append will create duplicates.
-      # See the "If you already have env_variables in app.yaml" note below.
+      # Copy your repo app.yaml to a temporary deploy file
       cp app.yaml app.deploy.yaml
 
-      cat >> app.deploy.yaml <<EOF
-env_variables:
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "$$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
-  CLERK_SECRET_KEY: "$$CLERK_SECRET_KEY"
-  MONGODB_URI: "$$MONGODB_URI"
-  OPENROUTER_API_KEY: "$$OPENROUTER_API_KEY"
-EOF
+      # Append env_variables to the deploy YAML using printf (safe; avoids heredoc indentation issues)
+      printf 'env_variables:\n' >> app.deploy.yaml
+      printf '  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "%s"\n' "$$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" >> app.deploy.yaml
+      printf '  CLERK_SECRET_KEY: "%s"\n' "$$CLERK_SECRET_KEY" >> app.deploy.yaml
+      printf '  MONGODB_URI: "%s"\n' "$$MONGODB_URI" >> app.deploy.yaml
+      printf '  OPENROUTER_API_KEY: "%s"\n' "$$OPENROUTER_API_KEY" >> app.deploy.yaml
 
-      # Deploy the modified YAML (no --set-env-vars — correct for App Engine)
+      # Deploy the modified YAML (correct for App Engine)
       gcloud app deploy app.deploy.yaml --project=neural-land-469712-t7 --quiet
 
 availableSecrets:
