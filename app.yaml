@@ -5,14 +5,8 @@ entrypoint: npm run start
 env: standard
 
 automatic_scaling:
-  min_instances: 0   # pay only when there’s traffic
+  min_instances: 0
   max_instances: 2
   target_cpu_utilization: 0.65
 
 service_account: nextjs-app-sa@neural-land-469712-t7.iam.gserviceaccount.com
-
-env_variables:
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_cmVsZXZhbnQtc25haWwtMS5jbGVyay5hY2NvdW50cy5kZXYk
-  CLERK_SECRET_KEY: sk_test_ZQHXNpdQ7q37HbzBCF8zfqd1e5KcRHbjXEFrHsWlk5
-  MONGODB_URI: mongodb+srv://mak53797571:Jy3X0iE7mCuOkEma@cluster0.gccun0i.mongodb.net/Project0?retryWrites=true&w=majority
-  OPENROUTER_API_KEY: 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
