@@ -12,7 +12,12 @@ steps:
   args:
     - '-c'
     - |
-      # No need to export, secrets are already in env
+      # Export secrets into shell so Next.js build can see them
+      export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+      export CLERK_SECRET_KEY=$CLERK_SECRET_KEY
+      export MONGODB_URI=$MONGODB_URI
+      export OPENROUTER_API_KEY=$OPENROUTER_API_KEY
+
       npm ci
       npm run build
 
