@@ -12,7 +12,9 @@ steps:
   args:
     - '-c'
     - |
-      # Export secrets into shell so Next.js build can see them
+      set -euo pipefail
+
+      # Export secrets into shell so Next.js build can see them.
       # Use $$ to escape $ so Cloud Build doesn't treat these as template substitutions.
       export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$$_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
       export CLERK_SECRET_KEY=$$_CLERK_SECRET_KEY
@@ -25,7 +27,6 @@ steps:
 - name: 'gcr.io/cloud-builders/gcloud'
   id: deploy
   entrypoint: 'bash'
-  # secrets must be injected again for this step (each step is isolated)
   secretEnv:
     - _NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
     - _CLERK_SECRET_KEY
@@ -34,17 +35,29 @@ steps:
   args:
     - '-c'
     - |
-      # Export secrets in this step too so we can pass them to gcloud
+      set -euo pipefail
+
+      # Make the secrets available in this step (use $$ to avoid Cloud Build pre-substitution).
       export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$$_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
       export CLERK_SECRET_KEY=$$_CLERK_SECRET_KEY
       export MONGODB_URI=$$_MONGODB_URI
       export OPENROUTER_API_KEY=$$_OPENROUTER_API_KEY
 
-      # Deploy and inject runtime env vars into App Engine.
-      # Use $$NEXT_PUBLIC... so Cloud Build doesn't try to substitute during parsing;
-      # the shell (inside this step) will expand them at runtime.
-      gcloud app deploy app.yaml --project=neural-land-469712-t7 --quiet \
-        --set-env-vars "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,CLERK_SECRET_KEY=$$CLERK_SECRET_KEY,MONGODB_URI=$$MONGODB_URI,OPENROUTER_API_KEY=$$OPENROUTER_API_KEY"
+      # Create a temporary deploy YAML by copying the repo app.yaml and appending env_variables.
+      # If your repo's app.yaml already contains env_variables, this simple append will create duplicates.
+      # See the "If you already have env_variables in app.yaml" note below.
+      cp app.yaml app.deploy.yaml
+
+      cat >> app.deploy.yaml <<EOF
+env_variables:
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "$$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
+  CLERK_SECRET_KEY: "$$CLERK_SECRET_KEY"
+  MONGODB_URI: "$$MONGODB_URI"
+  OPENROUTER_API_KEY: "$$OPENROUTER_API_KEY"
+EOF
+
+      # Deploy the modified YAML (no --set-env-vars — correct for App Engine)
+      gcloud app deploy app.deploy.yaml --project=neural-land-469712-t7 --quiet
 
 availableSecrets:
   secretManager:
