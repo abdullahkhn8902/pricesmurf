@@ -1,4 +1,4 @@
-# cloudbuild.yaml — fetch secrets, build with Node 22 builder, deploy to App Engine
+# cloudbuild.yaml — fetch secrets, build with Node 22 image, deploy to App Engine
 timeout: "1200s"
 
 steps:
@@ -17,18 +17,27 @@ steps:
         echo "Secrets fetched"
 
   - id: "build"
-    # Use Node 22 builder image. This image has npm/node ready for build.
-    name: "gcr.io/cloud-builders/docker"
+    # Use official Node 22 image from Docker Hub
+    name: "node:22-bullseye"
     entrypoint: "bash"
     args:
       - "-c"
       - |
         set -e
-        # move to workspace and show node version
-        echo "Using Node image to build..."
-        # install node 22 quickly with n (if not present) or use node image via docker
-        # We'll run npm inside a temporary node container to ensure Node 22
-        docker run --rm -v "$PWD":/workspace -w /workspace node:22-bullseye bash -lc "npm ci && export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=\"$(cat /workspace/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY)\" && export CLERK_SECRET_KEY=\"$(cat /workspace/CLERK_SECRET_KEY)\" && export MONGODB_URI=\"$(cat /workspace/MONGODB_URI)\" && export OPENROUTER_API_KEY=\"$(cat /workspace/OPENROUTER_API_KEY)\" && npm run build"
+        echo "Workspace path: /workspace"
+        cd /workspace
+        echo "Node version:"
+        node -v || true
+        echo "Installing dependencies..."
+        npm ci
+        echo "Injecting build-time env vars from Secret Manager files..."
+        export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="$(cat /workspace/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY)"
+        export CLERK_SECRET_KEY="$(cat /workspace/CLERK_SECRET_KEY)"
+        export MONGODB_URI="$(cat /workspace/MONGODB_URI)"
+        export OPENROUTER_API_KEY="$(cat /workspace/OPENROUTER_API_KEY)"
+        echo "Running next build..."
+        npm run build
+        echo "Build finished"
 
   - id: "deploy"
     name: "gcr.io/cloud-builders/gcloud"
