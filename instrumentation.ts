@@ -1,20 +1,23 @@
-const { SecretManagerServiceClient } = require('@google-cloud/secret-manager');
-
-// Add string type annotations to the parameters
-async function getSecret(projectId: string, secretName: string): Promise<string> {
-    const client = new SecretManagerServiceClient();
-    const name = `projects/${projectId}/secrets/${secretName}/versions/latest`;
-    const [version] = await client.accessSecretVersion({ name });
-    return version.payload.data.toString('utf8');
-}
-
 export async function register() {
-    const projectId = 'neural-land-469712-t7';
-
     if (process.env.NEXT_RUNTIME === 'nodejs') {
+        const { SecretManagerServiceClient } = await import('@google-cloud/secret-manager');
+
+        async function getSecret(projectId: string, secretName: string): Promise<string> {
+            const client = new SecretManagerServiceClient();
+            const name = `projects/${projectId}/secrets/${secretName}/versions/latest`;
+            const [version] = await client.accessSecretVersion({ name });
+
+            // Add explicit checks for version, payload, and data
+            if (!version?.payload?.data) {
+                throw new Error(`Secret '${secretName}' not found or has no data.`);
+            }
+
+            return version.payload.data.toString('utf8');
+        }
+
         try {
             console.log('Fetching secrets from Secret Manager...');
-
+            const projectId = 'neural-land-469712-t7';
             const clerkSecretKey = await getSecret(projectId, 'CLERK_SECRET_KEY');
             const mongodbUri = await getSecret(projectId, 'MONGODB_URI');
             const openrouterApiKey = await getSecret(projectId, 'OPENROUTER_API_KEY');
