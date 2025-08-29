@@ -10,8 +10,3 @@ automatic_scaling:
   target_cpu_utilization: 0.65
 
 service_account: nextjs-app-sa@neural-land-469712-t7.iam.gserviceaccount.com
-
-env_variables:
-  CLERK_SECRET_KEY: "CLERK_SECRET_KEY"
-  MONGODB_URI: "MONGODB_URI"
-  OPENROUTER_API_KEY: "OPENROUTER_API_KEY"
