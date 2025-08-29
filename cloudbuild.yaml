@@ -1,6 +1,7 @@
 timeout: "1200s"
 
 steps:
+# 1) Build the app (this step has secretEnv and does npm run build)
 - name: 'node:22-bullseye'
   id: build
   entrypoint: 'bash'
@@ -14,16 +15,70 @@ steps:
     - |
       set -euo pipefail
 
-      # Export secrets into shell so Next.js build can see them.
-      # Use $$ to escape $ so Cloud Build doesn't treat these as template substitutions.
+      # export secrets for this build step (escaped $ so Cloud Build doesn't pre-substitute)
       export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$$_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
       export CLERK_SECRET_KEY=$$_CLERK_SECRET_KEY
       export MONGODB_URI=$$_MONGODB_URI
       export OPENROUTER_API_KEY=$$_OPENROUTER_API_KEY
 
+      echo "Installing dependencies and building..."
       npm ci
       npm run build
 
+      # ensure production node_modules exist so we can copy them into the image (avoid rebuilding)
+      npm ci --production
+
+      echo "Build step finished."
+
+# 2) Create a minimal Dockerfile that uses the prebuilt artifacts (no 'npm run build' here)
+- name: 'gcr.io/cloud-builders/docker'
+  id: dockerfile
+  entrypoint: 'bash'
+  args:
+    - '-c'
+    - |
+      set -euo pipefail
+      echo "Writing Dockerfile..."
+      cat > Dockerfile <<'DOCKEREOF'
+      FROM node:22-bullseye
+      WORKDIR /app
+
+      # copy package.json so 'npm start' can work and installed deps are present
+      COPY package*.json ./
+
+      # copy node_modules produced in build step (we ran npm ci --production above)
+      COPY node_modules ./node_modules
+
+      # copy built next output and static assets
+      COPY .next ./.next
+      COPY public ./public
+      COPY next.config.js ./
+      COPY package.json ./
+
+      # Expose default App Engine port
+      EXPOSE 8080
+
+      # Use the start script from package.json (must run next start)
+      CMD ["npm", "start"]
+      DOCKEREOF
+      echo "Dockerfile created."
+
+# 3) Build the docker image and push to Container Registry (uses docker builder)
+# Using the Cloud Build built-in $PROJECT_ID and $SHORT_SHA
+- name: 'gcr.io/cloud-builders/docker'
+  id: build-and-push-image
+  args:
+    - 'build'
+    - '-t'
+    - 'gcr.io/$PROJECT_ID/pricesmurf:$SHORT_SHA'
+    - '.'
+- name: 'gcr.io/cloud-builders/docker'
+  id: push-image
+  args:
+    - 'push'
+    - 'gcr.io/$PROJECT_ID/pricesmurf:$SHORT_SHA'
+
+# 4) Deploy to App Engine using the pushed image (no remote build)
 - name: 'gcr.io/cloud-builders/gcloud'
   id: deploy
   entrypoint: 'bash'
@@ -37,24 +92,30 @@ steps:
     - |
       set -euo pipefail
 
-      # Make the secrets available in this step (use $$ to avoid Cloud Build pre-substitution).
+      # Make the secret values available in this step (shell will expand $$ to $)
       export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$$_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
       export CLERK_SECRET_KEY=$$_CLERK_SECRET_KEY
       export MONGODB_URI=$$_MONGODB_URI
       export OPENROUTER_API_KEY=$$_OPENROUTER_API_KEY
 
-      # Copy your repo app.yaml to a temporary deploy file
-      cp app.yaml app.deploy.yaml
+      # Create a minimal app.deploy.yaml that uses a custom runtime (flex) so we can deploy a container image.
+      # This file is created at runtime in the build container and never stored in repo.
+      cat > app.deploy.yaml <<'EOF'
+runtime: custom
+env: flex
+EOF
 
-      # Append env_variables to the deploy YAML using printf (safe; avoids heredoc indentation issues)
+      # Append runtime environment variables (runtime envs — not baked into image)
       printf 'env_variables:\n' >> app.deploy.yaml
       printf '  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "%s"\n' "$$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" >> app.deploy.yaml
       printf '  CLERK_SECRET_KEY: "%s"\n' "$$CLERK_SECRET_KEY" >> app.deploy.yaml
       printf '  MONGODB_URI: "%s"\n' "$$MONGODB_URI" >> app.deploy.yaml
       printf '  OPENROUTER_API_KEY: "%s"\n' "$$OPENROUTER_API_KEY" >> app.deploy.yaml
 
-      # Deploy the modified YAML (correct for App Engine)
-      gcloud app deploy app.deploy.yaml --project=neural-land-469712-t7 --quiet
+      # Deploy the pre-built image to App Engine flexible using --image-url; this avoids remote builds.
+      IMAGE_URL="gcr.io/$PROJECT_ID/pricesmurf:$SHORT_SHA"
+      echo "Deploying image $IMAGE_URL with app.deploy.yaml ..."
+      gcloud app deploy app.deploy.yaml --image-url="$IMAGE_URL" --project="$PROJECT_ID" --quiet
 
 availableSecrets:
   secretManager:
