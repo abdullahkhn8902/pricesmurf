@@ -1,28 +1,6 @@
 timeout: "1200s"
 
 steps:
-- name: 'node:22-bullseye'
-  id: build
-  entrypoint: 'bash'
-  secretEnv:
-    - _NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-    - _CLERK_SECRET_KEY
-    - _MONGODB_URI
-    - _OPENROUTER_API_KEY
-  args:
-    - '-c'
-    - |
-      set -euo pipefail
-
-      # Export secrets using single $ to expand Cloud Build secrets
-      export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-      export CLERK_SECRET_KEY=$_CLERK_SECRET_KEY
-      export MONGODB_URI=$_MONGODB_URI
-      export OPENROUTER_API_KEY=$_OPENROUTER_API_KEY
-
-      npm ci
-      npm run build
-
 - name: 'gcr.io/cloud-builders/gcloud'
   id: deploy
   entrypoint: 'bash'
@@ -36,7 +14,7 @@ steps:
     - |
       set -euo pipefail
 
-      # Make the secrets available in this step (use $$ to avoid Cloud Build pre-substitution).
+      # Use double $$ to escape the $ for Cloud Build parsing
       export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$$_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
       export CLERK_SECRET_KEY=$$_CLERK_SECRET_KEY
       export MONGODB_URI=$$_MONGODB_URI
@@ -45,14 +23,21 @@ steps:
       # Copy your repo app.yaml to a temporary deploy file
       cp app.yaml app.deploy.yaml
 
-      # Append env_variables to the deploy YAML using printf (safe; avoids heredoc indentation issues)
+      # Append build_env_variables for build-time environment variables
+      printf 'build_env_variables:\n' >> app.deploy.yaml
+      printf '  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "%s"\n' "$$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" >> app.deploy.yaml
+      printf '  CLERK_SECRET_KEY: "%s"\n' "$$CLERK_SECRET_KEY" >> app.deploy.yaml
+      printf '  MONGODB_URI: "%s"\n' "$$MONGODB_URI" >> app.deploy.yaml
+      printf '  OPENROUTER_API_KEY: "%s"\n' "$$OPENROUTER_API_KEY" >> app.deploy.yaml
+
+      # Append env_variables for runtime environment variables
       printf 'env_variables:\n' >> app.deploy.yaml
       printf '  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "%s"\n' "$$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" >> app.deploy.yaml
       printf '  CLERK_SECRET_KEY: "%s"\n' "$$CLERK_SECRET_KEY" >> app.deploy.yaml
       printf '  MONGODB_URI: "%s"\n' "$$MONGODB_URI" >> app.deploy.yaml
       printf '  OPENROUTER_API_KEY: "%s"\n' "$$OPENROUTER_API_KEY" >> app.deploy.yaml
 
-      # Deploy the modified YAML (correct for App Engine)
+      # Deploy the modified YAML
       gcloud app deploy app.deploy.yaml --project=neural-land-469712-t7 --quiet
 
 availableSecrets:
