@@ -1,36 +1,36 @@
 steps:
-# Fetch secrets from Secret Manager
-- name: gcr.io/cloud-builders/gcloud
-  id: fetch-secrets
-  entrypoint: bash
-  args:
-    - -c
-    - |
-      gcloud secrets versions access latest --secret NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY > /workspace/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-      gcloud secrets versions access latest --secret CLERK_SECRET_KEY > /workspace/CLERK_SECRET_KEY
-      gcloud secrets versions access latest --secret MONGODB_URI > /workspace/MONGODB_URI
-      gcloud secrets versions access latest --secret OPENROUTER_API_KEY > /workspace/OPENROUTER_API_KEY
-
-# Build with secrets injected
-- name: node:22-bullseye
+- name: 'node:22-bullseye'
   id: build
-  entrypoint: bash
+  entrypoint: 'bash'
   args:
-    - -c
+    - '-c'
     - |
-      echo "Installing dependencies..."
       npm ci
-      echo "Building Next.js..."
-      export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$(cat /workspace/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY)
-      export CLERK_SECRET_KEY=$(cat /workspace/CLERK_SECRET_KEY)
-      export MONGODB_URI=$(cat /workspace/MONGODB_URI)
-      export OPENROUTER_API_KEY=$(cat /workspace/OPENROUTER_API_KEY)
       npm run build
+  secretEnv:
+    - 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY'
+    - 'CLERK_SECRET_KEY'
+    - 'MONGODB_URI'
+    - 'OPENROUTER_API_KEY'
 
 # Deploy to App Engine
-- name: gcr.io/cloud-builders/gcloud
+- name: 'gcr.io/cloud-builders/gcloud'
   id: deploy
-  entrypoint: bash
+  entrypoint: 'bash'
   args:
-    - -c
-    - gcloud app deploy app.yaml --project=$PROJECT_ID --quiet
+    - '-c'
+    - gcloud app deploy app.yaml --project=neural-land-469712-t7 --quiet
+
+availableSecrets:
+- secretManager:
+    versionName: projects/neural-land-469712-t7/secrets/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY/versions/latest
+    env: 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY'
+- secretManager:
+    versionName: projects/neural-land-469712-t7/secrets/CLERK_SECRET_KEY/versions/latest
+    env: 'CLERK_SECRET_KEY'
+- secretManager:
+    versionName: projects/neural-land-469712-t7/secrets/MONGODB_URI/versions/latest
+    env: 'MONGODB_URI'
+- secretManager:
+    versionName: projects/neural-land-469712-t7/secrets/OPENROUTER_API_KEY/versions/latest
+    env: 'OPENROUTER_API_KEY'
