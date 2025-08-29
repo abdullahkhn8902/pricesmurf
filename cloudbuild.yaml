@@ -1,4 +1,5 @@
 steps:
+# 1️⃣ Fetch secrets from Secret Manager
 - name: gcr.io/cloud-builders/gcloud
   id: fetch-secrets
   entrypoint: bash
@@ -11,6 +12,7 @@ steps:
       export MONGODB_URI=$(gcloud secrets versions access latest --secret=MONGODB_URI --project=$PROJECT_ID)
       export OPENROUTER_API_KEY=$(gcloud secrets versions access latest --secret=OPENROUTER_API_KEY --project=$PROJECT_ID)
 
+# 2️⃣ Build Next.js with secrets injected
 - name: node:22-bullseye
   id: build
   entrypoint: bash
@@ -26,6 +28,7 @@ steps:
       OPENROUTER_API_KEY=$OPENROUTER_API_KEY \
       npm run build
 
+# 3️⃣ Deploy to App Engine
 - name: gcr.io/cloud-builders/gcloud
   id: deploy
   entrypoint: bash
