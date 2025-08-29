@@ -1,52 +1,32 @@
-# cloudbuild.yaml — fetch secrets, build with Node 22 image, deploy to App Engine
-timeout: "1200s"
-
 steps:
-  - id: "fetch-secrets"
-    name: "gcr.io/cloud-builders/gcloud"
-    entrypoint: "bash"
-    args:
-      - "-c"
-      - |
-        set -e
-        echo "Fetching secrets from Secret Manager..."
-        gcloud secrets versions access latest --secret NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY --project=neural-land-469712-t7 > /workspace/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-        gcloud secrets versions access latest --secret CLERK_SECRET_KEY --project=neural-land-469712-t7 > /workspace/CLERK_SECRET_KEY
-        gcloud secrets versions access latest --secret MONGODB_URI --project=neural-land-469712-t7 > /workspace/MONGODB_URI
-        gcloud secrets versions access latest --secret OPENROUTER_API_KEY --project=neural-land-469712-t7 > /workspace/OPENROUTER_API_KEY
-        echo "Secrets fetched"
-
-  - id: "build"
-    # Use official Node 22 image from Docker Hub
-    name: "node:22-bullseye"
-    entrypoint: "bash"
-    args:
-      - "-c"
-      - |
-        set -e
-        echo "Workspace path: /workspace"
-        cd /workspace
-        echo "Node version:"
-        node -v || true
-        echo "Installing dependencies..."
-        npm ci
-        echo "Injecting build-time env vars from Secret Manager files..."
-        export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="$(cat /workspace/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY)"
-        export CLERK_SECRET_KEY="$(cat /workspace/CLERK_SECRET_KEY)"
-        export MONGODB_URI="$(cat /workspace/MONGODB_URI)"
-        export OPENROUTER_API_KEY="$(cat /workspace/OPENROUTER_API_KEY)"
-        echo "Running next build..."
-        npm run build
-        echo "Build finished"
-
-  - id: "deploy"
-    name: "gcr.io/cloud-builders/gcloud"
-    entrypoint: "bash"
-    args:
-      - "-c"
-      - |
-        set -e
-        echo "Deploying to App Engine..."
-        gcloud app deploy app.yaml --project=neural-land-469712-t7 --quiet
-
-artifacts: {}
+# Fetch secrets
+- name: gcr.io/cloud-builders/gcloud
+  id: fetch-secrets
+  entrypoint: bash
+  args:
+    - -c
+    - |
+      set -e
+      echo "Fetching secrets from Secret Manager..."
+      export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$(gcloud secrets versions access latest --secret=NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY)
+      export CLERK_SECRET_KEY=$(gcloud secrets versions access latest --secret=CLERK_SECRET_KEY)
+      export MONGODB_URI=$(gcloud secrets versions access latest --secret=MONGODB_URI)
+      export OPENROUTER_API_KEY=$(gcloud secrets versions access latest --secret=OPENROUTER_API_KEY)
+      echo "Secrets fetched"
+# Build
+- name: node:22-bullseye
+  id: build
+  entrypoint: bash
+  args:
+    - -c
+    - |
+      set -e
+      npm ci
+      npm run build
+# Deploy
+- name: gcr.io/cloud-builders/gcloud
+  id: deploy
+  entrypoint: bash
+  args:
+    - -c
+    - gcloud app deploy app.yaml --project=$PROJECT_ID --quiet
