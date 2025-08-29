@@ -14,53 +14,15 @@ steps:
     - |
       set -euo pipefail
 
-      # Export secrets for this build step (use $$ to avoid Cloud Build pre-substitution)
+      # Export secrets into shell so Next.js build can see them.
+      # Use $$ to escape $ so Cloud Build doesn't treat these as template substitutions.
       export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$$_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
       export CLERK_SECRET_KEY=$$_CLERK_SECRET_KEY
       export MONGODB_URI=$$_MONGODB_URI
       export OPENROUTER_API_KEY=$$_OPENROUTER_API_KEY
 
-      echo "Installing dependencies and building..."
       npm ci
       npm run build
-
-      # Ensure production node_modules exist for the image
-      npm ci --production
-
-      echo "Build finished."
-
-- name: 'gcr.io/cloud-builders/docker'
-  id: create-dockerfile
-  entrypoint: 'bash'
-  args:
-    - '-c'
-    - |
-      set -euo pipefail
-      echo "Generating Dockerfile..."
-      printf 'FROM node:22-bullseye\n' > Dockerfile
-      printf 'WORKDIR /app\n' >> Dockerfile
-      printf 'COPY package*.json ./\n' >> Dockerfile
-      printf 'COPY node_modules ./node_modules\n' >> Dockerfile
-      printf 'COPY .next ./.next\n' >> Dockerfile
-      printf 'COPY public ./public\n' >> Dockerfile
-      printf 'COPY next.config.js ./\n' >> Dockerfile
-      printf 'EXPOSE 8080\n' >> Dockerfile
-      printf 'CMD [\"npm\",\"start\"]\n' >> Dockerfile
-      echo "Dockerfile created."
-
-- name: 'gcr.io/cloud-builders/docker'
-  id: build-image
-  args:
-    - 'build'
-    - '-t'
-    - 'gcr.io/$PROJECT_ID/pricesmurf:$BUILD_ID'
-    - '.'
-
-- name: 'gcr.io/cloud-builders/docker'
-  id: push-image
-  args:
-    - 'push'
-    - 'gcr.io/$PROJECT_ID/pricesmurf:$BUILD_ID'
 
 - name: 'gcr.io/cloud-builders/gcloud'
   id: deploy
@@ -75,26 +37,32 @@ steps:
     - |
       set -euo pipefail
 
-      # Make secrets available in this step (shell expands $$ to $)
+      # Make the secrets available in this step (use $$ to avoid Cloud Build pre-substitution).
       export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$$_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
       export CLERK_SECRET_KEY=$$_CLERK_SECRET_KEY
       export MONGODB_URI=$$_MONGODB_URI
       export OPENROUTER_API_KEY=$$_OPENROUTER_API_KEY
 
-      # Create app.deploy.yaml (App Engine flexible custom runtime using the pushed image)
-      printf 'runtime: custom\n' > app.deploy.yaml
-      printf 'env: flex\n' >> app.deploy.yaml
+      # Copy your repo app.yaml to a temporary deploy file
+      cp app.yaml app.deploy.yaml
 
+      # Append env_variables to the deploy YAML using printf (safe; avoids heredoc indentation issues)
       printf 'env_variables:\n' >> app.deploy.yaml
       printf '  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "%s"\n' "$$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" >> app.deploy.yaml
       printf '  CLERK_SECRET_KEY: "%s"\n' "$$CLERK_SECRET_KEY" >> app.deploy.yaml
       printf '  MONGODB_URI: "%s"\n' "$$MONGODB_URI" >> app.deploy.yaml
       printf '  OPENROUTER_API_KEY: "%s"\n' "$$OPENROUTER_API_KEY" >> app.deploy.yaml
 
-      IMAGE_URL="gcr.io/$PROJECT_ID/pricesmurf:$BUILD_ID"
-      echo "Deploying image $IMAGE_URL using app.deploy.yaml ..."
-      gcloud app deploy app.deploy.yaml --image-url="$IMAGE_URL" --project="$PROJECT_ID" --quiet
+      # Deploy the modified YAML (correct for App Engine)
+      gcloud app deploy app.deploy.yaml --project=neural-land-469712-t7 --quiet
 
 availableSecrets:
   secretManager:
-    - versionName: "projects/neural-land-469712-t7/secrets/NEXT
+    - versionName: "projects/neural-land-469712-t7/secrets/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY/versions/latest"
+      env: "_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
+    - versionName: "projects/neural-land-469712-t7/secrets/CLERK_SECRET_KEY/versions/latest"
+      env: "_CLERK_SECRET_KEY"
+    - versionName: "projects/neural-land-469712-t7/secrets/MONGODB_URI/versions/latest"
+      env: "_MONGODB_URI"
+    - versionName: "projects/neural-land-469712-t7/secrets/OPENROUTER_API_KEY/versions/latest"
+      env: "_OPENROUTER_API_KEY"
