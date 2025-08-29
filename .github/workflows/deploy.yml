@@ -24,20 +24,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Export secrets into build env
-        run: |
-          echo "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}" >> $GITHUB_ENV
-          echo "CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}" >> $GITHUB_ENV
-          echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> $GITHUB_ENV
-          echo "OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}" >> $GITHUB_ENV
-
-      - name: Build app
-        run: npm run build
-        env:
-          _NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets._NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          _CLERK_SECRET_KEY: ${{ secrets._CLERK_SECRET_KEY }}
-          _MONGODB_URI: ${{ secrets._MONGODB_URI }}
-          _OPENROUTER_API_KEY: ${{ secrets._OPENROUTER_API_KEY }}
+      # No need to export secrets here for the build, they are handled by Cloud Build
+      # If you want to run local build tests before submit, you can export GitHub secrets here
 
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v1
