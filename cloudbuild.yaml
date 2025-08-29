@@ -1,24 +1,43 @@
-steps:
-  # Install dependencies
-  - name: "gcr.io/cloud-builders/npm"
-    dir: "frontend"
-    args: ["install"]
-
-  # Build Next.js app
-  - name: "gcr.io/cloud-builders/npm"
-    dir: "frontend"
-    args: ["run", "build"]
-
-  # Deploy to Cloud Run (using Buildpacks, no Dockerfile needed)
-  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
-    entrypoint: gcloud
-    args:
-      - run
-      - deploy
-      - pricesmurf-frontend
-      - --source=./frontend
-      - --region=asia-south1
-      - --platform=managed
-      - --allow-unauthenticated
-
+# cloudbuild.yaml — fetch secrets, build with Node 22 builder, deploy to App Engine
 timeout: "1200s"
+
+steps:
+  - id: "fetch-secrets"
+    name: "gcr.io/cloud-builders/gcloud"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        set -e
+        echo "Fetching secrets from Secret Manager..."
+        gcloud secrets versions access latest --secret NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY --project=neural-land-469712-t7 > /workspace/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+        gcloud secrets versions access latest --secret CLERK_SECRET_KEY --project=neural-land-469712-t7 > /workspace/CLERK_SECRET_KEY
+        gcloud secrets versions access latest --secret MONGODB_URI --project=neural-land-469712-t7 > /workspace/MONGODB_URI
+        gcloud secrets versions access latest --secret OPENROUTER_API_KEY --project=neural-land-469712-t7 > /workspace/OPENROUTER_API_KEY
+        echo "Secrets fetched"
+
+  - id: "build"
+    # Use Node 22 builder image. This image has npm/node ready for build.
+    name: "gcr.io/cloud-builders/docker"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        set -e
+        # move to workspace and show node version
+        echo "Using Node image to build..."
+        # install node 22 quickly with n (if not present) or use node image via docker
+        # We'll run npm inside a temporary node container to ensure Node 22
+        docker run --rm -v "$PWD":/workspace -w /workspace node:22-bullseye bash -lc "npm ci && export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=\"$(cat /workspace/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY)\" && export CLERK_SECRET_KEY=\"$(cat /workspace/CLERK_SECRET_KEY)\" && export MONGODB_URI=\"$(cat /workspace/MONGODB_URI)\" && export OPENROUTER_API_KEY=\"$(cat /workspace/OPENROUTER_API_KEY)\" && npm run build"
+
+  - id: "deploy"
+    name: "gcr.io/cloud-builders/gcloud"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        set -e
+        echo "Deploying to App Engine..."
+        gcloud app deploy app.yaml --project=neural-land-469712-t7 --quiet
+
+artifacts: {}

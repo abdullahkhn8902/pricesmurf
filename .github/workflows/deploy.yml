@@ -50,6 +50,6 @@ jobs:
           project_id: neural-land-469712-t7
           export_default_credentials: true
 
-      - name: Deploy built app to App Engine
+      - name: Submit Cloud Build (build + deploy)
         run: |
-          gcloud app deploy app.yaml --project=neural-land-469712-t7 --quiet
+          gcloud builds submit --config cloudbuild.yaml --project=neural-land-469712-t7 .
