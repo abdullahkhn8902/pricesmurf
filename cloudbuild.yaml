@@ -14,12 +14,11 @@ steps:
     - |
       set -euo pipefail
 
-      # Export secrets into shell so Next.js build can see them.
-      # Use $$ to escape $ so Cloud Build doesn't treat these as template substitutions.
-      export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$$_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-      export CLERK_SECRET_KEY=$$_CLERK_SECRET_KEY
-      export MONGODB_URI=$$_MONGODB_URI
-      export OPENROUTER_API_KEY=$$_OPENROUTER_API_KEY
+      # Export secrets using single $ to expand Cloud Build secrets
+      export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+      export CLERK_SECRET_KEY=$_CLERK_SECRET_KEY
+      export MONGODB_URI=$_MONGODB_URI
+      export OPENROUTER_API_KEY=$_OPENROUTER_API_KEY
 
       npm ci
       npm run build
