@@ -1,3 +1,6 @@
+# cloudbuild.yaml — fetch secrets, build with Node 22 image, deploy to App Engine
+timeout: "1200s"
+
 steps:
 - name: 'node:22-bullseye'
   id: build
@@ -13,7 +16,6 @@ steps:
     - 'MONGODB_URI'
     - 'OPENROUTER_API_KEY'
 
-# Deploy to App Engine
 - name: 'gcr.io/cloud-builders/gcloud'
   id: deploy
   entrypoint: 'bash'
@@ -34,3 +36,4 @@ availableSecrets:
 - secretManager:
     versionName: projects/neural-land-469712-t7/secrets/OPENROUTER_API_KEY/versions/latest
     env: 'OPENROUTER_API_KEY'
+
