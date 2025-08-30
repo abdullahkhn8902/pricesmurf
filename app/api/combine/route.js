@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import ExcelJS from 'exceljs';
 import { Readable } from 'stream';
-
+import { VertexAI } from '@google-cloud/vertexai';
 
 // Prevent static analysis during build
 export const dynamic = 'force-dynamic';
@@ -134,7 +134,8 @@ function parseAIResponse(response) {
 export async function POST(request) {
     let sessionId = null;
     const uri = process.env.MONGODB_URI;
-    const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+    const VERTEX_AI_PROJECT = process.env.VERTEX_AI_PROJECT;
+    const VERTEX_AI_LOCATION = process.env.VERTEX_AI_LOCATION;
 
     if (!uri) {
         return NextResponse.json(
@@ -143,9 +144,9 @@ export async function POST(request) {
         );
     }
 
-    if (!OPENROUTER_API_KEY) {
+    if (!VERTEX_AI_PROJECT || !VERTEX_AI_LOCATION) {
         return NextResponse.json(
-            { error: 'OPENROUTER_API_KEY missing in environment variables' },
+            { error: 'Vertex AI configuration missing in environment variables' },
             { status: 500 }
         );
     }
@@ -271,7 +272,7 @@ export async function POST(request) {
             return text;
         }));
 
-        // Build DeepSeek prompt
+        // Build Gemini prompt
         let prompt = ``;
 
         if (createNewTable) {
@@ -317,95 +318,42 @@ COLUMN STANDARDIZATION PRINCIPLES:
             prompt += `\n\nJOIN REQUIREMENT: Use ${joinType}`;
         }
 
-        console.log('Sending request to OpenRouter API...');
+        console.log('Sending request to Vertex AI API...');
 
-        const domain = process.env.NODE_ENV === 'development'
-            ? 'http://localhost:3000'
-            : 'https://your-actual-domain.com';
+        // Initialize Vertex AI
+        const vertexAI = new VertexAI({
+            project: VERTEX_AI_PROJECT,
+            location: VERTEX_AI_LOCATION,
+        });
+
+        // Use Gemini 2.5 Flash Lite model
+        const model = vertexAI.preview.getGenerativeModel({
+            model: "gemini-2.5-flash-lite"
+        });
+
+        // Vertex AI request
+        const vertexRequest = {
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+        };
 
         // Add timeout to API request
         const controller = new AbortController();
         const aiTimeout = setTimeout(() => controller.abort(), 180000); // 3-minute timeout
         const vercelTimeout = setTimeout(() => controller.abort(), 9000); // 9s for Vercel timeout buffer
 
-        const apiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': domain,
-                'X-Title': 'DataCombiner',
-            },
-            body: JSON.stringify({
-                model: 'deepseek/deepseek-r1:free',
-                messages: [{
-                    role: 'user',
-                    content: prompt
-                }],
-                temperature: 0.1,
-                max_tokens: 8192
-            }),
-            signal: controller.signal
-        }).finally(() => {
+        let result;
+        try {
+            result = await model.generateContent(vertexRequest);
             clearTimeout(aiTimeout);
             clearTimeout(vercelTimeout);
-        });
-
-        if (!apiResponse.ok) {
-            processingLocks.delete(sessionId);
-            const errorText = await apiResponse.text();
-            console.error('OpenRouter API error:', apiResponse.status, errorText.substring(0, 500));
-            throw new Error(`OpenRouter API error: ${apiResponse.status}`);
+        } catch (error) {
+            clearTimeout(aiTimeout);
+            clearTimeout(vercelTimeout);
+            throw error;
         }
 
-        // Stream and accumulate response to avoid Vercel memory limits
-        const reader = apiResponse.body.getReader();
-        const decoder = new TextDecoder();
-        let responseText = '';
-        let chunkCount = 0;
-
-        while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-
-            chunkCount++;
-            responseText += decoder.decode(value, { stream: true });
-        }
-
-        console.log(`Received ${responseText.length} chars in ${chunkCount} chunks`);
-
-        // Validate content before parsing
-        const contentType = apiResponse.headers.get('content-type') || '';
-        if (!contentType.includes('application/json')) {
-            console.error('Non-JSON response:', responseText.substring(0, 1000));
-            throw new Error('Invalid response format');
-        }
-
-        let responseData;
-        try {
-            responseData = JSON.parse(responseText);
-        } catch (e) {
-            // Attempt NDJSON parsing
-            if (responseText.includes('\n')) {
-                console.warn('Attempting NDJSON parsing');
-                const ndjson = parseNDJSON(responseText);
-                if (ndjson.length > 0) {
-                    responseData = { choices: [{ message: { content: JSON.stringify(ndjson) } }] };
-                }
-            }
-
-            if (!responseData) {
-                console.error('JSON parse failed:', responseText.substring(0, 1000));
-                throw e;
-            }
-        }
-
-        // Check for truncated response
-        if (responseData.choices[0]?.finish_reason === 'length') {
-            console.warn('Response truncated due to token limit');
-        }
-
-        const jsonString = responseData.choices[0].message.content.trim();
+        const response = result?.response ?? result;
+        const jsonString = response?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'No analysis generated';
 
         console.log('============= RAW API RESPONSE ===========');
         console.log(jsonString.substring(0, 500) + (jsonString.length > 500 ? '...' : ''));
@@ -503,7 +451,6 @@ COLUMN STANDARDIZATION PRINCIPLES:
         } catch (err) {
             console.error('Combined file categorization error:', err);
         }
-
 
         // FIX: Use excelBuffer for size calculation
         return NextResponse.json({ fileId: uploadStream.id, combinedFileId: uploadStream.id }, {

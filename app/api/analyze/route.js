@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { parse } from 'csv-parse/sync';
 import * as XLSX from 'xlsx';
 import { NextResponse } from 'next/server';
+import { VertexAI } from '@google-cloud/vertexai';
 
 // Prevent static analysis during build
 export const dynamic = 'force-dynamic';
@@ -79,7 +80,8 @@ async function processFileData(buffer, filename, contentType) {
 
 export async function POST(request) {
     const uri = process.env.MONGODB_URI;
-    const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+    const VERTEX_AI_PROJECT = process.env.VERTEX_AI_PROJECT;
+    const VERTEX_AI_LOCATION = process.env.VERTEX_AI_LOCATION;
 
     if (!uri) {
         return NextResponse.json(
@@ -88,9 +90,9 @@ export async function POST(request) {
         );
     }
 
-    if (!OPENROUTER_API_KEY) {
+    if (!VERTEX_AI_PROJECT || !VERTEX_AI_LOCATION) {
         return NextResponse.json(
-            { error: 'OPENROUTER_API_KEY missing in environment variables' },
+            { error: 'Vertex AI configuration missing in environment variables' },
             { status: 500 }
         );
     }
@@ -142,43 +144,35 @@ export async function POST(request) {
             return NextResponse.json({ error: 'No valid data found' }, { status: 400 });
         }
 
+        // Initialize Vertex AI
+        const vertexAI = new VertexAI({
+            project: VERTEX_AI_PROJECT,
+            location: VERTEX_AI_LOCATION,
+        });
+
+        const model = vertexAI.preview.getGenerativeModel({
+            model: "gemini-2.5-flash-lite"
+        });
+
+
+
         // Generate AI analysis
         const dataString = JSON.stringify({ columns, data }, null, 2);
         const defaultPrompt = `Analyze this CRM data and provide insights on customer trends, 
                             opportunities, and key patterns. Include actionable recommendations.`;
 
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'http://localhost:3000',
-                'X-Title': 'AI CRM',
-            },
-            body: JSON.stringify({
-                model: 'deepseek/deepseek-r1:free',
-                messages: [{
-                    role: 'user',
-                    content: customPrompt
-                        ? `${customPrompt}\n\nData:\n${dataString}`
-                        : `${defaultPrompt}\n\nData:\n${dataString}`
-                }],
-                temperature: 0.7,
-                max_tokens: 1000
-            }),
-        });
+        const prompt = customPrompt
+            ? `${customPrompt}\n\nData:\n${dataString}`
+            : `${defaultPrompt}\n\nData:\n${dataString}`;
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error('DeepSeek API Error:', errorData);
-            return NextResponse.json(
-                { error: 'Analysis failed', details: errorData },
-                { status: response.status }
-            );
-        }
+        // Fixed: Renamed the variable to avoid conflict with the function parameter
+        const vertexRequest = {
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+        };
 
-        const result = await response.json();
-        const analysis = result.choices[0]?.message?.content?.trim() || 'No analysis generated';
+        const result = await model.generateContent(vertexRequest);
+        const response = result?.response ?? result;
+        const analysis = response?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'No analysis generated';
 
         // Store analysis in database
         await db.collection('analyses').updateOne(

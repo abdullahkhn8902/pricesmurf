@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { MongoClient, ObjectId, GridFSBucket } from 'mongodb';
 import ExcelJS from 'exceljs';
+import { VertexAI } from '@google-cloud/vertexai';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,10 +70,12 @@ export async function GET(request) {
 
     // 3) Connect to Mongo
     const uri = process.env.MONGODB_URI;
-    const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-    if (!uri || !OPENROUTER_API_KEY) {
+    const VERTEX_AI_PROJECT = process.env.VERTEX_AI_PROJECT;
+    const VERTEX_AI_LOCATION = process.env.VERTEX_AI_LOCATION;
+
+    if (!uri || !VERTEX_AI_PROJECT || !VERTEX_AI_LOCATION) {
         return NextResponse.json(
-            { error: 'Missing MONGODB_URI or OPENROUTER_API_KEY' },
+            { error: 'Missing MONGODB_URI or Vertex AI configuration' },
             { status: 500 }
         );
     }
@@ -133,7 +136,7 @@ export async function GET(request) {
         // 7) Extract headers & sample rows
         const headers = sheet.getRow(1).values.slice(1).map(String);
         const sampleRows = [];
-        for (let i = 2; i <= Math.min(4, sheet.rowCount); i++) {
+        for (let i = 2; i <= Math.min(6, sheet.rowCount); i++) {
             sampleRows.push(
                 sheet.getRow(i).values.slice(1).map(cell =>
                     cell?.toString?.() || ''
@@ -141,32 +144,8 @@ export async function GET(request) {
             );
         }
 
-        // Build base prompt without custom subcategories
-        let basePrompt = `You are part of PriceSmurf.  
-Classify this table into exactly one JSON with category & subcategory.
-
-CATEGORIES:
-🏢 Company Tables: Products, Customers  
-⚙️ Parameters: Pricing Parameters, Tax Rates  
-📅 Transactions: Historical Transactions  
-📂 Other Tables: Uncategorized  
-
-For your help more explanation :
-A table containing ProductID, ProductName, etc. → Company Tables > Products
-A table containing CustomerID, CustomerName → Company Tables > Customers
-A table containing Country, TaxRate → Parameters
-Historical sales transactions → Transactions
-
-For tables containing multiple columns of different categories just analyze which category has highest number of columns suggest that category and subcategory accordingly.
-
-Return ONLY JSON with no additional text. Example: 
-{"category":"Company Tables","subcategory":"Products"}
-
-Columns: ${JSON.stringify(headers)}  
-Sample Rows:  
-${sampleRows.map(r => JSON.stringify(r)).join('\n')}`;
-
-        // Try to add custom subcategories if available
+        // Get custom subcategories if available
+        let customSubcategories = {};
         try {
             const token = await getToken();
             const requestOrigin = request.headers.get('origin') || new URL(request.url).origin;
@@ -178,81 +157,114 @@ ${sampleRows.map(r => JSON.stringify(r)).join('\n')}`;
 
             if (subsRes.ok) {
                 const customSubs = await subsRes.json();
-                const customSubsByCategory = customSubs.reduce((acc, sub) => {
+                customSubcategories = customSubs.reduce((acc, sub) => {
                     if (!acc[sub.category]) acc[sub.category] = [];
                     acc[sub.category].push(sub.subcategory);
                     return acc;
                 }, {});
-
-                // Build enhanced prompt with custom subcategories
-                let basePrompt = `You are part of PriceSmurf. Classify this table into exactly one JSON object with category & subcategory.
-
-STRICT RULES:
-1. Return ONLY pure JSON without any additional text, explanations, or code blocks
-2. Use this exact format: {"category":"Category Name","subcategory":"Subcategory Name"}
-
-CATEGORIES:
-🏢 Company Tables: Products, Customers  
-⚙️ Parameters: Pricing Parameters, Tax Rates  
-📅 Transactions: Historical Transactions  
-📂 Other Tables: Uncategorized  
-
-EXAMPLES:
-- Columns: ["ProductID", "ProductName"] → {"category":"Company Tables","subcategory":"Products"}
-- Columns: ["CustomerID", "CustomerName"] → {"category":"Company Tables","subcategory":"Customers"}
-- Columns: ["TaxRate", "Country"] → {"category":"Parameters","subcategory":"Tax Rates"}
-
-Columns: ${JSON.stringify(headers)}  
-Sample Rows:  
-${sampleRows.map(r => JSON.stringify(r)).join('\n')}`;
             }
         } catch (err) {
-            console.error('Error fetching subcategories, using base prompt:', err);
+            console.error('Error fetching subcategories:', err);
         }
 
-        // 8) Call AI with robust error handling
+        // Enhanced prompt with better categorization logic
+        const enhancedPrompt = `You are a data classification expert for PriceSmurf, a pricing optimization platform. 
+
+TASK: Classify this spreadsheet data table into exactly one category and subcategory.
+
+CRITICAL RULES:
+1. Return ONLY pure JSON without any additional text, explanations, or markdown
+2. Use this exact format: {"category":"Category Name","subcategory":"Subcategory Name"}
+3. Choose the most specific subcategory that matches the data
+4. If multiple categories could fit, choose based on the PRIMARY purpose of the data
+
+CATEGORIES AND SUBCATEGORIES:
+🏢 Company Tables:
+  - Products: Product IDs, names, descriptions, SKUs, categories, attributes
+  - Customers: Customer IDs, names, segments, demographics, contact info
+  - Suppliers: Vendor IDs, names, contact information, performance metrics
+  - Employees: Staff data, roles, departments, compensation
+  ${customSubcategories['Company Tables'] ? `- Custom: ${customSubcategories['Company Tables'].join(', ')}` : ''}
+
+⚙️ Parameters:
+  - Pricing Parameters: Discount rates, markup percentages, price tiers
+  - Tax Rates: Tax jurisdictions, rates, rules, exemptions
+  - Currency Rates: Exchange rates, conversion factors
+  - Cost Structures: Fixed/variable costs, overhead allocations
+  ${customSubcategories['Parameters'] ? `- Custom: ${customSubcategories['Parameters'].join(', ')}` : ''}
+
+📅 Transactions:
+  - Sales: Invoices, orders, line items, quantities, prices, dates
+  - Purchases: Procurement, vendor orders, receipt records
+  - Inventory: Stock levels, movements, adjustments, valuations
+  - Financial: Payments, receipts, journal entries, accounting records
+  ${customSubcategories['Transactions'] ? `- Custom: ${customSubcategories['Transactions'].join(', ')}` : ''}
+
+📊 Analytics:
+  - Performance Metrics: KPIs, benchmarks, scorecards, dashboards
+  - Market Data: Competitor prices, market trends, industry benchmarks
+  - Forecasts: Demand predictions, price projections, sales forecasts
+  ${customSubcategories['Analytics'] ? `- Custom: ${customSubcategories['Analytics'].join(', ')}` : ''}
+
+📂 Other Tables:
+  - Reference Data: Lookup tables, codes, mappings, configurations
+  - Uncategorized: Data that doesn't fit other categories
+  ${customSubcategories['Other Tables'] ? `- Custom: ${customSubcategories['Other Tables'].join(', ')}` : ''}
+
+DECISION GUIDELINES:
+1. If table contains product identifiers (SKU, ProductID, ItemNo) → Company Tables > Products
+2. If table contains customer identifiers (CustomerID, ClientID) → Company Tables > Customers
+3. If table contains transaction details (InvoiceNo, OrderID, SaleDate) → Transactions > Sales
+4. If table contains pricing parameters (Discount%, Markup, Tier) → Parameters > Pricing Parameters
+5. If table contains tax information (TaxRate, Jurisdiction) → Parameters > Tax Rates
+6. If table contains inventory movements (StockLevel, Warehouse) → Transactions > Inventory
+7. If table contains performance metrics (KPI, Target, Actual) → Analytics > Performance Metrics
+
+DATA TO CLASSIFY:
+Filename: ${file.filename}
+Columns: ${JSON.stringify(headers)}
+Sample Data (first 5 rows):
+${sampleRows.map((row, i) => `Row ${i + 1}: ${JSON.stringify(row)}`).join('\n')}
+
+YOUR RESPONSE (JSON ONLY):`;
+
+        // Initialize Vertex AI
+        const vertexAI = new VertexAI({
+            project: VERTEX_AI_PROJECT,
+            location: VERTEX_AI_LOCATION,
+        });
+
+        // Use Gemini 2.5 Flash Lite model
+        const model = vertexAI.preview.getGenerativeModel({
+            model: "gemini-2.5-flash-lite",
+            generationConfig: {
+                temperature: 0.1, // Lower temperature for more deterministic responses
+                maxOutputTokens: 200, // Limit output to just the JSON we need
+            }
+        });
+
+        // Vertex AI request
+        const vertexRequest = {
+            contents: [{ role: "user", parts: [{ text: enhancedPrompt }] }],
+        };
+
+        // 8) Call Vertex AI with timeout
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 45000); // 45s timeout
+        const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
-        const aiRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: 'deepseek/deepseek-r1:free',
-                messages: [{
-                    role: 'user',
-                    content: basePrompt
-                }],
-                temperature: 0.2,
-                max_tokens: 500 // Increased to allow full response
-            }),
-            signal: controller.signal
-        }).finally(() => clearTimeout(timeout));
-
-        // Handle API errors
-        if (!aiRes.ok) {
-            const errorBody = await aiRes.text();
-            console.error('OpenRouter API error:', aiRes.status, errorBody);
-            throw new Error(`OpenRouter API error: ${aiRes.status}`);
+        let result;
+        try {
+            result = await model.generateContent(vertexRequest);
+            clearTimeout(timeout);
+        } catch (error) {
+            clearTimeout(timeout);
+            throw error;
         }
 
-        const aiJson = await aiRes.json();
-        console.log('OpenRouter API response:', JSON.stringify(aiJson, null, 2));
-
-        // Enhanced response validation
-        let rawText = '';
-        if (aiJson.choices?.[0]?.message?.content) {
-            rawText = aiJson.choices[0].message.content.trim();
-        } else if (aiJson.choices?.[0]?.message?.reasoning) {
-            // Fallback to reasoning field if content is empty
-            rawText = aiJson.choices[0].message.reasoning.trim();
-        }
+        const response = result?.response ?? result;
+        const rawText = response?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
 
         if (!rawText) {
-            console.error('Invalid OpenRouter response:', JSON.stringify(aiJson, null, 2));
             throw new Error('AI response is empty');
         }
 
@@ -266,29 +278,16 @@ ${sampleRows.map(r => JSON.stringify(r)).join('\n')}`;
             console.error('JSON parse error:', e.message);
             console.error('Raw content:', rawText.substring(0, 500));
 
-            const fixResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    model: 'deepseek/deepseek-r1:free',
-                    messages: [{
-                        role: 'user',
-                        content: `Fix this JSON output: ${rawText.substring(0, 1000)}\n\nReturn ONLY valid JSON.`
-                    }],
-                    temperature: 0.1,
-                    max_tokens: 200
-                })
-            });
-
-            if (fixResponse.ok) {
-                const fixJson = await fixResponse.json();
-                const fixedText = fixJson.choices[0].message.content.trim();
-                classification = parseAIResponse(fixedText);
-            } else {
-                throw new Error('Failed to fix AI response: ' + e.message);
+            // Try a simpler extraction approach
+            try {
+                const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    classification = JSON.parse(jsonMatch[0]);
+                } else {
+                    throw new Error('No JSON found in response');
+                }
+            } catch (secondError) {
+                throw new Error('Failed to parse AI response: ' + e.message);
             }
         }
 
@@ -303,7 +302,8 @@ ${sampleRows.map(r => JSON.stringify(r)).join('\n')}`;
             {
                 $set: {
                     'metadata.category': classification.category,
-                    'metadata.subcategory': classification.subcategory
+                    'metadata.subcategory': classification.subcategory,
+                    'metadata.categorizedAt': new Date()
                 }
             }
         );
