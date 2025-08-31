@@ -14,9 +14,7 @@ export async function POST(request) {
         }
 
         const uri = process.env.MONGODB_URI;
-        const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
         if (!uri) throw new Error('MONGODB_URI missing in .env.local');
-        if (!OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY missing');
 
         client = new MongoClient(uri);
         await client.connect();

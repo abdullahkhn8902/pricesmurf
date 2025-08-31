@@ -29,15 +29,17 @@ jobs:
           echo "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}" >> $GITHUB_ENV
           echo "CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}" >> $GITHUB_ENV
           echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> $GITHUB_ENV
-          echo "OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}" >> $GITHUB_ENV
+          echo "VERTEX_AI_PROJECT=${{ secrets.VERTEX_AI_PROJECT }}" >> $GITHUB_ENV
+          echo "VERTEX_AI_LOCATION=${{ secrets.VERTEX_AI_LOCATION }}" >> $GITHUB_ENV
 
       - name: Build app
         run: npm run build
         env:
-          _NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets._NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          _CLERK_SECRET_KEY: ${{ secrets._CLERK_SECRET_KEY }}
-          _MONGODB_URI: ${{ secrets._MONGODB_URI }}
-          _OPENROUTER_API_KEY: ${{ secrets._OPENROUTER_API_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          VERTEX_AI_PROJECT: ${{ secrets.VERTEX_AI_PROJECT }}
+          VERTEX_AI_LOCATION: ${{ secrets.VERTEX_AI_LOCATION }}
 
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v1
