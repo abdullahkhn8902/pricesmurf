@@ -11,12 +11,12 @@ export const dynamic = 'force-dynamic';
 // Initialize Vertex AI with proper configuration
 let vertexAI;
 try {
-    vertexAI = new VertexAI({
-        project: process.env.VERTEX_AI_PROJECT || 'neural-land-469712-t7',
-        location: process.env.VERTEX_AI_LOCATION || 'us-central1',
-        // Explicit API endpoint for production stability
-        apiEndpoint: 'us-central1-aiplatform.googleapis.com'
+    const vertexAI = new VertexAI({
+        project: process.env.VERTEX_AI_PROJECT,
+        location: process.env.VERTEX_AI_LOCATION,
+        apiEndpoint: `${process.env.VERTEX_AI_LOCATION}-aiplatform.googleapis.com`
     });
+
     console.log('Vertex AI initialized successfully');
 } catch (error) {
     console.error('Vertex AI initialization error:', error);
@@ -165,13 +165,13 @@ export async function POST(request) {
 
         // Use the latest model API (not preview)
         const model = vertexAI.getGenerativeModel({
-            model: "gemini-2.5-flash-lite",
+            model: "gemini-1.5-flash",
             generationConfig: {
                 temperature: 0.7,
                 maxOutputTokens: 1000,
-                topP: 0.8,
             },
         });
+
 
         // Generate AI analysis
         const dataString = JSON.stringify({ columns, data }, null, 2);
