@@ -146,7 +146,7 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Invalid file ID' }, { status: 400 });
         }
 
-        // Get file metadata
+        // Get file metadata with size check
         const filesCollection = db.collection('excelFiles.files');
         const file = await filesCollection.findOne({
             _id: new ObjectId(fileId),
@@ -155,10 +155,32 @@ export async function POST(request) {
 
         if (!file) return NextResponse.json({ error: 'File not found' }, { status: 404 });
 
-        // Download file content
+        // Check file size before processing (10MB limit for App Engine)
+        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+        if (file.length > MAX_FILE_SIZE) {
+            return NextResponse.json(
+                { error: 'File size exceeds the 10MB limit for processing' },
+                { status: 400 }
+            );
+        }
+
+        // Download file content with memory monitoring
         const downloadStream = bucket.openDownloadStream(new ObjectId(fileId));
         const chunks = [];
-        for await (const chunk of downloadStream) chunks.push(chunk);
+        let totalSize = 0;
+
+        for await (const chunk of downloadStream) {
+            chunks.push(chunk);
+            totalSize += chunk.length;
+
+            // Check memory usage during download to prevent overflow
+            if (totalSize > MAX_FILE_SIZE) {
+                return NextResponse.json(
+                    { error: 'File processing exceeded memory limits' },
+                    { status: 400 }
+                );
+            }
+        }
         const buffer = Buffer.concat(chunks);
 
         // Process file data
@@ -185,10 +207,10 @@ export async function POST(request) {
             },
         });
 
-        // Generate AI analysis with optimized data size
+        // Generate AI analysis with optimized data size - limit to 20 rows
         const dataForAnalysis = {
             columns,
-            data: data.slice(0, 50) // Limit data sent to Vertex AI to prevent overload
+            data: data.slice(0, 20) // Reduced from 50 to 20 rows to prevent overload
         };
 
         const dataString = JSON.stringify(dataForAnalysis, null, 2);
