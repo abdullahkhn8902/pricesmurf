@@ -8,37 +8,18 @@ import { VertexAI } from '@google-cloud/vertexai';
 // Prevent static analysis during build
 export const dynamic = 'force-dynamic';
 
-function logEnvironmentDetails() {
-    console.log('Environment Details:', {
-        NODE_ENV: process.env.NODE_ENV,
-        VERTEX_AI_PROJECT: process.env.VERTEX_AI_PROJECT ? 'Set' : 'Not Set',
-        VERTEX_AI_LOCATION: process.env.VERTEX_AI_LOCATION ? 'Set' : 'Not Set',
-        MONGODB_URI: process.env.MONGODB_URI ? 'Set' : 'Not Set',
-        NodeVersion: process.version,
-        Platform: process.platform
-    });
-}
-
-
 // Initialize Vertex AI with proper configuration
 let vertexAI;
 try {
-    if (!process.env.VERTEX_AI_PROJECT || !process.env.VERTEX_AI_LOCATION) {
-        console.warn('Vertex AI environment variables not set during initialization');
-    } else {
-        vertexAI = new VertexAI({
-            project: process.env.VERTEX_AI_PROJECT,
-            location: process.env.VERTEX_AI_LOCATION,
-            apiEndpoint: `${process.env.VERTEX_AI_LOCATION}-aiplatform.googleapis.com`
-        });
-        console.log('Vertex AI initialized successfully');
-    }
-} catch (error) {
-    console.error('Vertex AI initialization error:', {
-        message: error.message,
-        stack: error.stack,
-        code: error.code
+    vertexAI = new VertexAI({
+        project: process.env.VERTEX_AI_PROJECT || 'neural-land-469712-t7',
+        location: process.env.VERTEX_AI_LOCATION || 'us-central1',
+        // Explicit API endpoint for production stability
+        apiEndpoint: 'us-central1-aiplatform.googleapis.com'
     });
+    console.log('Vertex AI initialized successfully');
+} catch (error) {
+    console.error('Vertex AI initialization error:', error);
 }
 
 async function processFileData(buffer, filename, contentType) {
@@ -112,15 +93,11 @@ async function processFileData(buffer, filename, contentType) {
 }
 
 export async function POST(request) {
-    // Log environment details at the start of the request
-    logEnvironmentDetails();
-
     const uri = process.env.MONGODB_URI;
     const VERTEX_AI_PROJECT = process.env.VERTEX_AI_PROJECT;
     const VERTEX_AI_LOCATION = process.env.VERTEX_AI_LOCATION;
 
     if (!uri) {
-        console.error('MONGODB_URI missing');
         return NextResponse.json(
             { error: 'MONGODB_URI missing in environment variables' },
             { status: 500 }
@@ -128,10 +105,6 @@ export async function POST(request) {
     }
 
     if (!VERTEX_AI_PROJECT || !VERTEX_AI_LOCATION) {
-        console.error('Vertex AI config missing:', {
-            VERTEX_AI_PROJECT: VERTEX_AI_PROJECT,
-            VERTEX_AI_LOCATION: VERTEX_AI_LOCATION
-        });
         return NextResponse.json(
             { error: 'Vertex AI configuration missing in environment variables' },
             { status: 500 }
@@ -142,8 +115,6 @@ export async function POST(request) {
 
     try {
         await client.connect();
-        console.log('MongoDB connected successfully');
-
         const db = client.db('Project0');
         const bucket = new GridFSBucket(db, { bucketName: 'excelFiles' });
 
@@ -151,16 +122,10 @@ export async function POST(request) {
         const fileId = searchParams.get('fileId');
         const { customPrompt } = await request.json();
 
-        console.log('Request parameters:', { fileId, hasCustomPrompt: !!customPrompt });
-
         const { userId } = await auth();
-        if (!userId) {
-            console.error('Unauthorized access attempt');
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
+        if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         if (!fileId || !ObjectId.isValid(fileId)) {
-            console.error('Invalid file ID:', fileId);
             return NextResponse.json({ error: 'Invalid file ID' }, { status: 400 });
         }
 
@@ -171,12 +136,7 @@ export async function POST(request) {
             'metadata.userId': userId
         });
 
-        if (!file) {
-            console.error('File not found:', fileId);
-            return NextResponse.json({ error: 'File not found' }, { status: 404 });
-        }
-
-        console.log('File found:', { filename: file.filename, size: file.length });
+        if (!file) return NextResponse.json({ error: 'File not found' }, { status: 404 });
 
         // Download file content
         const downloadStream = bucket.openDownloadStream(new ObjectId(fileId));
@@ -194,83 +154,37 @@ export async function POST(request) {
             contentType
         );
 
-        console.log('File processed:', { columns: columns.length, rows: data.length });
-
         if (!columns.length || !data.length) {
-            console.error('No valid data found in file');
             return NextResponse.json({ error: 'No valid data found' }, { status: 400 });
         }
 
-        // Reinitialize Vertex AI if needed (for serverless environments)
-        let vertexAIInstance = vertexAI;
-        if (!vertexAIInstance) {
-            console.log('Reinitializing Vertex AI');
-            try {
-                vertexAIInstance = new VertexAI({
-                    project: VERTEX_AI_PROJECT,
-                    location: VERTEX_AI_LOCATION,
-                    apiEndpoint: `${VERTEX_AI_LOCATION}-aiplatform.googleapis.com`
-                });
-            } catch (error) {
-                console.error('Vertex AI reinitialization failed:', error);
-                throw new Error('Vertex AI initialization failed: ' + error.message);
-            }
+        // Check if Vertex AI was initialized properly
+        if (!vertexAI) {
+            throw new Error('Vertex AI not initialized');
         }
 
-        // Try multiple model names with fallback
-        const modelNames = [
-            "gemini-1.5-flash",
-            "gemini-1.5-flash-001",
-            "gemini-1.0-pro"
-        ];
-
-        let model;
-        let modelError;
-
-        for (const modelName of modelNames) {
-            try {
-                console.log('Trying model:', modelName);
-                model = vertexAIInstance.getGenerativeModel({
-                    model: modelName,
-                    generationConfig: {
-                        temperature: 0.7,
-                        maxOutputTokens: 1000,
-                        topP: 0.8,
-                    },
-                });
-
-                // Test with a simple request
-                const testResult = await model.generateContent({
-                    contents: [{ role: "user", parts: [{ text: "Hello" }] }],
-                });
-
-                console.log('Model test successful:', modelName);
-                break; // Exit loop if successful
-            } catch (error) {
-                modelError = error;
-                console.warn(`Model ${modelName} failed:`, error.message);
-            }
-        }
-
-        if (!model) {
-            console.error('All model attempts failed:', modelError);
-            throw new Error(`All model attempts failed: ${modelError.message}`);
-        }
+        // Use the latest model API (not preview)
+        const model = vertexAI.getGenerativeModel({
+            model: "gemini-2.5-flash-lite",
+            generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 1000,
+                topP: 0.8,
+            },
+        });
 
         // Generate AI analysis
-        const dataString = JSON.stringify({ columns, data: data.slice(0, 10) }, null, 2); // Only send first 10 rows to reduce token usage
+        const dataString = JSON.stringify({ columns, data }, null, 2);
         const defaultPrompt = `Analyze this CRM data and provide insights on customer trends, 
-                          opportunities, and key patterns. Include actionable recommendations.`;
+                            opportunities, and key patterns. Include actionable recommendations.`;
 
         const prompt = customPrompt
             ? `${customPrompt}\n\nData:\n${dataString}`
             : `${defaultPrompt}\n\nData:\n${dataString}`;
 
-        console.log('Sending request to Vertex AI with prompt length:', prompt.length);
-
         // Vertex AI request with timeout
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 45000); // 45 second timeout
+        const timeout = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
         try {
             const result = await model.generateContent({
@@ -281,8 +195,6 @@ export async function POST(request) {
 
             const response = result?.response;
             const analysis = response?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'No analysis generated';
-
-            console.log('Vertex AI response received, analysis length:', analysis.length);
 
             // Store analysis in database
             await db.collection('analyses').updateOne(
@@ -304,47 +216,25 @@ export async function POST(request) {
             }, { status: 200 });
 
         } catch (vertexError) {
-            clearTimeout(timeout);
-
             if (vertexError.name === 'AbortError') {
-                console.error('Vertex AI request timed out after 45 seconds');
-                throw new Error('Vertex AI request timed out after 45 seconds');
+                throw new Error('Vertex AI request timed out after 30 seconds');
             }
-
-            console.error('Vertex AI API Error details:', {
-                message: vertexError.message,
-                code: vertexError.code,
-                details: vertexError.details,
-                status: vertexError.status,
-                stack: vertexError.stack
-            });
-
+            console.error('Vertex AI API Error:', vertexError);
             throw new Error(`Vertex AI processing failed: ${vertexError.message}`);
         }
 
     } catch (error) {
-        console.error('Full Analysis Error:', {
-            message: error.message,
-            stack: error.stack,
-            code: error.code,
-            details: error.details
-        });
-
+        console.error('Analysis Error:', error);
         return NextResponse.json(
             {
                 error: 'Internal server error',
                 details: error.message,
-                // Include more details for debugging
-                ...(process.env.NODE_ENV === 'development' && {
-                    stack: error.stack,
-                    code: error.code,
-                    fullError: JSON.stringify(error, Object.getOwnPropertyNames(error))
-                })
+                // Include more details for debugging in production
+                ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
             },
             { status: 500 }
         );
     } finally {
         await client.close();
-        console.log('MongoDB connection closed');
     }
 }
