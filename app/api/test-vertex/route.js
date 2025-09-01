@@ -26,6 +26,9 @@ export async function GET() {
             contents: [{ role: 'user', parts: [{ text: 'How are you?' }] }],
         });
 
+        await sleep(5000);
+
+
         console.log('Vertex AI response:', JSON.stringify(result, null, 2));
         return new Response(JSON.stringify({ success: true, result }, null, 2));
     } catch (err) {
