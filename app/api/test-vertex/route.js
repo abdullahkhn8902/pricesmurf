@@ -14,6 +14,11 @@ try {
     console.error('Vertex AI init error:', err);
 }
 
+// Sleep helper
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function GET() {
     try {
         if (!vertexAI) throw new Error('Vertex AI not initialized');
@@ -26,10 +31,11 @@ export async function GET() {
             contents: [{ role: 'user', parts: [{ text: 'How are you?' }] }],
         });
 
+        console.log('Vertex AI response:', JSON.stringify(result, null, 2));
+
+        // Sleep for 3 seconds before sending response
         await sleep(5000);
 
-
-        console.log('Vertex AI response:', JSON.stringify(result, null, 2));
         return new Response(JSON.stringify({ success: true, result }, null, 2));
     } catch (err) {
         console.error('Vertex AI call error:', err);
