@@ -7,13 +7,17 @@ import { VertexAI } from '@google-cloud/vertexai';
 
 export const dynamic = 'force-dynamic';
 
-// Initialize Vertex AI with proper configuration
+// Initialize Vertex AI with proper configuration (trim env values)
 let vertexAI;
 try {
+    const PROJECT = (process.env.VERTEX_AI_PROJECT || 'neural-land-469712-t7').toString().trim();
+    const LOCATION = (process.env.VERTEX_AI_LOCATION || 'us-central1').toString().trim();
+    const API_ENDPOINT = `${LOCATION}-aiplatform.googleapis.com`;
+
     vertexAI = new VertexAI({
-        project: process.env.VERTEX_AI_PROJECT || 'neural-land-469712-t7',
-        location: process.env.VERTEX_AI_LOCATION || 'us-central1',
-        apiEndpoint: 'us-central1-aiplatform.googleapis.com'
+        project: PROJECT,
+        location: LOCATION,
+        apiEndpoint: API_ENDPOINT,
     });
     console.log('Vertex AI initialized successfully');
 } catch (error) {
@@ -32,18 +36,14 @@ async function processFileData(buffer, filename, contentType) {
     };
 
     const isCSV = () => {
-        // Safe content type check
         if (contentType && typeof contentType === 'string') {
             if (contentType.toLowerCase().includes('csv')) return true;
             if (contentType.includes('excel') || contentType.includes('spreadsheet')) return false;
         }
-
-        // Safe filename check
         if (filename && typeof filename === 'string') {
             const lowerName = filename.toLowerCase();
             if (lowerName.endsWith('.csv')) return true;
         }
-
         return false;
     };
 
@@ -92,7 +92,6 @@ async function processFileData(buffer, filename, contentType) {
 
 export async function POST(request) {
     const uri = process.env.MONGODB_URI;
-    // trim env vars to avoid trailing-space mismatches
     const VERTEX_AI_PROJECT = (process.env.VERTEX_AI_PROJECT || 'neural-land-469712-t7').toString().trim();
     const VERTEX_AI_LOCATION = (process.env.VERTEX_AI_LOCATION || 'us-central1').toString().trim();
 
@@ -131,13 +130,13 @@ export async function POST(request) {
 
         if (!file) return NextResponse.json({ error: 'File not found' }, { status: 404 });
 
-        // Download file content
+        // Download file content (kept so we can return preview and store analysis tied to file)
         const downloadStream = bucket.openDownloadStream(new ObjectId(fileId));
         const chunks = [];
         for await (const chunk of downloadStream) chunks.push(chunk);
         const buffer = Buffer.concat(chunks);
 
-        // Process file data (uses your processFileData)
+        // Process file data (we still parse file for preview/storage but won't send it to Vertex)
         const filename = file.filename || 'unknown';
         const contentType = file.contentType || 'application/octet-stream';
         const { columns, data } = await processFileData(buffer, filename, contentType);
@@ -146,33 +145,29 @@ export async function POST(request) {
             return NextResponse.json({ error: 'No valid data found' }, { status: 400 });
         }
 
-        // Ensure vertexAI is initialized (we trimmed envs above when constructing it earlier)
+        // Ensure vertexAI is initialized; if not, try a minimal late-init
         if (!vertexAI) {
-            // defensive: try initializing here with trimmed values (mirrors your working test)
             try {
                 vertexAI = new VertexAI({
                     project: VERTEX_AI_PROJECT,
                     location: VERTEX_AI_LOCATION,
                     apiEndpoint: `${VERTEX_AI_LOCATION}-aiplatform.googleapis.com`,
                 });
-                console.log('Vertex AI late-init successful', { project: VERTEX_AI_PROJECT, location: VERTEX_AI_LOCATION });
+                console.log('Vertex AI late-init successful');
             } catch (initErr) {
                 console.error('Vertex AI late-init error:', initErr);
                 throw new Error('Vertex AI not initialized and late-init failed');
             }
-        } else {
-            console.log('Vertex AI already initialized (POST)', { assumedProject: VERTEX_AI_PROJECT, location: VERTEX_AI_LOCATION });
         }
 
-        // Build prompt
-        const dataString = JSON.stringify({ columns, data }, null, 2);
-        const defaultPrompt = `Analyze this CRM data and provide insights on customer trends, opportunities, and key patterns. Include actionable recommendations.`;
-        const prompt = customPrompt ? `${customPrompt}\n\nData:\n${dataString}` : `${defaultPrompt}\n\nData:\n${dataString}`;
+        // ---------- MINIMAL CHANGE: Send ONLY the user's prompt to Vertex AI ----------
+        if (!customPrompt || !customPrompt.toString().trim()) {
+            return NextResponse.json({ error: 'Missing prompt in request body' }, { status: 400 });
+        }
+        const prompt = customPrompt.toString().trim();
 
-        // --- IMPORTANT: use the same simple strategy that worked in your test handler ---
         const model = vertexAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
 
-        // Make the call exactly like your working test route
         let result;
         try {
             result = await model.generateContent({
@@ -180,9 +175,8 @@ export async function POST(request) {
             });
             console.log('Vertex AI result (raw):', JSON.stringify(result, null, 2));
         } catch (vErr) {
-            // surface the error with as much detail as possible for debugging
             console.error('Vertex AI generateContent error:', vErr);
-            // if it is a permission/403 error, vErr.message will contain details similar to what you pasted
+            // Throw to be caught by outer catch and returned as 500 with details
             throw vErr;
         }
 
@@ -207,15 +201,12 @@ export async function POST(request) {
 
     } catch (error) {
         console.error('Analysis Error (POST):', error);
-        // return and log detailed info to help debug 403
         return NextResponse.json({
             error: 'Internal server error',
             details: error?.message || String(error),
-            // expose stack only in development
             ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
         }, { status: 500 });
     } finally {
         await client.close();
     }
 }
-
