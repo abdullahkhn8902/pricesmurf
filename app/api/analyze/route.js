@@ -13,7 +13,6 @@ try {
     vertexAI = new VertexAI({
         project: process.env.VERTEX_AI_PROJECT || 'neural-land-469712-t7',
         location: process.env.VERTEX_AI_LOCATION || 'us-central1',
-        // Explicit API endpoint for production stability
         apiEndpoint: 'us-central1-aiplatform.googleapis.com'
     });
     console.log('Vertex AI initialized successfully');
@@ -93,21 +92,16 @@ async function processFileData(buffer, filename, contentType) {
 
 export async function POST(request) {
     const uri = process.env.MONGODB_URI;
-    const VERTEX_AI_PROJECT = process.env.VERTEX_AI_PROJECT;
-    const VERTEX_AI_LOCATION = process.env.VERTEX_AI_LOCATION;
+    // trim env vars to avoid trailing-space mismatches
+    const VERTEX_AI_PROJECT = (process.env.VERTEX_AI_PROJECT || 'neural-land-469712-t7').toString().trim();
+    const VERTEX_AI_LOCATION = (process.env.VERTEX_AI_LOCATION || 'us-central1').toString().trim();
 
     if (!uri) {
-        return NextResponse.json(
-            { error: 'MONGODB_URI missing in environment variables' },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'MONGODB_URI missing in environment variables' }, { status: 500 });
     }
 
     if (!VERTEX_AI_PROJECT || !VERTEX_AI_LOCATION) {
-        return NextResponse.json(
-            { error: 'Vertex AI configuration missing in environment variables' },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'Vertex AI configuration missing in environment variables' }, { status: 500 });
     }
 
     const client = new MongoClient(uri);
@@ -143,97 +137,85 @@ export async function POST(request) {
         for await (const chunk of downloadStream) chunks.push(chunk);
         const buffer = Buffer.concat(chunks);
 
-        // Process file data
+        // Process file data (uses your processFileData)
         const filename = file.filename || 'unknown';
         const contentType = file.contentType || 'application/octet-stream';
-
-        const { columns, data } = await processFileData(
-            buffer,
-            filename,
-            contentType
-        );
+        const { columns, data } = await processFileData(buffer, filename, contentType);
 
         if (!columns.length || !data.length) {
             return NextResponse.json({ error: 'No valid data found' }, { status: 400 });
         }
 
-        // Check if Vertex AI was initialized properly
+        // Ensure vertexAI is initialized (we trimmed envs above when constructing it earlier)
         if (!vertexAI) {
-            throw new Error('Vertex AI not initialized');
-        }
-
-        // Use the latest model API (not preview)
-        const model = vertexAI.getGenerativeModel({
-            model: "gemini-2.5-flash-lite",
-            generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: 1000,
-                topP: 0.8,
-            },
-        });
-
-        // Generate AI analysis
-        const dataString = JSON.stringify({ columns, data }, null, 2);
-        const defaultPrompt = `Analyze this CRM data and provide insights on customer trends, 
-                            opportunities, and key patterns. Include actionable recommendations.`;
-
-        const prompt = customPrompt
-            ? `${customPrompt}\n\nData:\n${dataString}`
-            : `${defaultPrompt}\n\nData:\n${dataString}`;
-
-        // Vertex AI request with timeout
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
-        try {
-            const result = await model.generateContent({
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
-            }, { signal: controller.signal });
-
-            clearTimeout(timeout);
-
-            const response = result?.response;
-            const analysis = response?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'No analysis generated';
-
-            // Store analysis in database
-            await db.collection('analyses').updateOne(
-                { fileId: new ObjectId(fileId), userId },
-                { $set: { analysis, updatedAt: new Date() } },
-                { upsert: true }
-            );
-
-            // Safe filename splitting
-            const sheetName = filename.includes('.')
-                ? filename.split('.')[0]
-                : 'Unnamed Sheet';
-
-            return NextResponse.json({
-                sheetName,
-                columns,
-                data: data.slice(0, 100), // Return first 100 rows for preview
-                analysis
-            }, { status: 200 });
-
-        } catch (vertexError) {
-            if (vertexError.name === 'AbortError') {
-                throw new Error('Vertex AI request timed out after 30 seconds');
+            // defensive: try initializing here with trimmed values (mirrors your working test)
+            try {
+                vertexAI = new VertexAI({
+                    project: VERTEX_AI_PROJECT,
+                    location: VERTEX_AI_LOCATION,
+                    apiEndpoint: `${VERTEX_AI_LOCATION}-aiplatform.googleapis.com`,
+                });
+                console.log('Vertex AI late-init successful', { project: VERTEX_AI_PROJECT, location: VERTEX_AI_LOCATION });
+            } catch (initErr) {
+                console.error('Vertex AI late-init error:', initErr);
+                throw new Error('Vertex AI not initialized and late-init failed');
             }
-            console.error('Vertex AI API Error:', vertexError);
-            throw new Error(`Vertex AI processing failed: ${vertexError.message}`);
+        } else {
+            console.log('Vertex AI already initialized (POST)', { assumedProject: VERTEX_AI_PROJECT, location: VERTEX_AI_LOCATION });
         }
+
+        // Build prompt
+        const dataString = JSON.stringify({ columns, data }, null, 2);
+        const defaultPrompt = `Analyze this CRM data and provide insights on customer trends, opportunities, and key patterns. Include actionable recommendations.`;
+        const prompt = customPrompt ? `${customPrompt}\n\nData:\n${dataString}` : `${defaultPrompt}\n\nData:\n${dataString}`;
+
+        // --- IMPORTANT: use the same simple strategy that worked in your test handler ---
+        const model = vertexAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+
+        // Make the call exactly like your working test route
+        let result;
+        try {
+            result = await model.generateContent({
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            });
+            console.log('Vertex AI result (raw):', JSON.stringify(result, null, 2));
+        } catch (vErr) {
+            // surface the error with as much detail as possible for debugging
+            console.error('Vertex AI generateContent error:', vErr);
+            // if it is a permission/403 error, vErr.message will contain details similar to what you pasted
+            throw vErr;
+        }
+
+        const response = result?.response;
+        const analysis = response?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'No analysis generated';
+
+        // Store analysis in DB
+        await db.collection('analyses').updateOne(
+            { fileId: new ObjectId(fileId), userId },
+            { $set: { analysis, updatedAt: new Date() } },
+            { upsert: true }
+        );
+
+        const sheetName = filename.includes('.') ? filename.split('.')[0] : 'Unnamed Sheet';
+
+        return NextResponse.json({
+            sheetName,
+            columns,
+            data: data.slice(0, 100),
+            analysis
+        }, { status: 200 });
 
     } catch (error) {
-        console.error('Analysis Error:', error);
-        return NextResponse.json(
-            {
-                error: 'Internal server error',
-                details: error.message,
-                // Include more details for debugging in production
-                ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
-            },
-            { status: 500 }
-        );
+        console.error('Analysis Error (POST):', error);
+        // return and log detailed info to help debug 403
+        return NextResponse.json({
+            error: 'Internal server error',
+            details: error?.message || String(error),
+            // expose stack only in development
+            ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
+        }, { status: 500 });
     } finally {
         await client.close();
     }
 }
+
