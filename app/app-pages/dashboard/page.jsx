@@ -33,8 +33,6 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { IconChevronDown, IconChevronRight } from "@tabler/icons-react";
 import { IconFileOff } from "@tabler/icons-react";
 
-// Register Hourglass component
-
 // Create inner component for Sidebar that uses useSearchParams
 function SidebarContent() {
   const [newSubcategoryModal, setNewSubcategoryModal] = useState({ open: false, category: '' });
@@ -268,8 +266,8 @@ function SidebarContent() {
   return (
     <div
       className={cn(
-        "mx-auto flex w-screen flex-1 flex-col overflow-hidden rounded-md border border-neutral-200 bg-gray-100 md:flex-row",
-        "h-screen",
+        "mx-auto flex w-screen flex-1 flex-col min-h-0 rounded-md border border-neutral-200 bg-gray-200 md:flex-row",
+        "min-h-screen",
       )}
     >
       <Sidebar open={open} setOpen={setOpen}>
@@ -656,7 +654,7 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
       }
 
       // fallback
-      const fallback = BASE_SUBCATS[selectedCategory] || [];
+      const fallback = BASE_SUBS[selectedCategory] || [];
       if (!cancelled) {
         setAvailableSubcategories(fallback);
         setSelectedSubcategory(fallback[0] || '');
@@ -813,8 +811,6 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
     setNewColumnRowValues({}); // Reset row values
     setError('');
   };
-
-
 
   const handleRemoveColumn = (columnName) => {
     if (columns.length <= 1) {
@@ -1004,110 +1000,73 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
   };
 
   return (
-    <div className="flex flex-1 ">
-      <div className="flex w-full flex-1 flex-col gap-2 rounded-tl-2xl border border-neutral-200 bg-gray-200 p-2 md:p-10">
-        <div className="flex justify-between items-center mt-2 px-4">
-          <div className="flex items-center justify-center w-full">
-            {isEditingFileName ? (
-              <div className="flex items-center">
-                <input
-                  type="text"
-                  value={newFileName}
-                  onChange={(e) => setNewFileName(e.target.value)}
-                  className="text-xl font-bold text-center dark:text-indigo-900 border-b border-indigo-900 bg-transparent px-2"
-                  autoFocus
-                />
-                <button
-                  onClick={handleSaveFileName}
-                  className="ml-2 px-2 py-1 bg-green-500 text-white rounded"
-                >
-                  Save
-                </button>
-                <button
-                  onClick={() => setIsEditingFileName(false)}
-                  className="ml-1 px-2 py-1 bg-gray-500 text-white rounded"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center">
-                <div className="text-xl font-bold dark:text-indigo-900">
-                  {sheetName}
+    <div className="flex flex-1 h-full">
+      <div className="flex w-full flex-1 flex-col min-h-0 gap-2 rounded-tl-2xl border border-neutral-200 bg-gray-200 p-2 md:p-10">
+        {/* HEADER + ACTIONS (responsive) */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mt-2 px-4 gap-3">
+          {/* Left: Title & inline controls */}
+          <div className="flex flex-col md:flex-row items-start md:items-center w-full md:w-auto gap-3">
+            <div className="flex items-center xl:ml-[9rem]">
+              {isEditingFileName ? (
+                <div className="flex items-center">
+                  <input
+                    type="text"
+                    value={newFileName}
+                    onChange={(e) => setNewFileName(e.target.value)}
+                    className="text-xl font-bold text-center dark:text-indigo-900 border-b border-indigo-900 bg-transparent px-2"
+                    autoFocus
+                  />
+                  <button onClick={handleSaveFileName} className="ml-2 px-2 py-1 bg-green-500 text-white rounded">Save</button>
+                  <button onClick={() => setIsEditingFileName(false)} className="ml-1 px-2 py-1 bg-gray-500 text-white rounded">Cancel</button>
                 </div>
-                {!isReadOnly && (
-                  <button
-                    onClick={() => {
-                      setIsEditingFileName(true);
-                      setNewFileName(sheetName);
-                    }}
-                    className="ml-2 text-indigo-900 hover:text-indigo-700"
-                  >
-                    <IconPencil size={18} />
-                  </button>
-                )}
-              </div>
-            )}
-            <div className="ml-4 flex items-center">
-              <label
-                htmlFor="readOnlyToggle"
-                className={cn(
-                  "relative block h-6 w-12 rounded-full transition-colors [-webkit-tap-highlight-color:_transparent]",
-                  isReadOnly ? "bg-yellow-500" : "bg-green-500"
-                )}
-              >
-                <input
-                  type="checkbox"
-                  id="readOnlyToggle"
-                  className="peer sr-only"
-                  checked={!isReadOnly}
-                  onChange={handleToggleReadOnly}
-                  disabled={isLoading}
-                />
-                <span
-                  className={cn(
-                    "absolute inset-y-0 start-0 m-0.5 size-5 rounded-full bg-white transition-all duration-300",
-                    isReadOnly ? "start-0" : "start-6"
+              ) : (
+                <div className="flex items-center">
+                  <div className="text-xl font-bold dark:text-indigo-900">{sheetName}</div>
+                  {!isReadOnly && (
+                    <button
+                      onClick={() => { setIsEditingFileName(true); setNewFileName(sheetName); }}
+                      className="ml-2 text-indigo-900 hover:text-indigo-700"
+                    >
+                      <IconPencil size={18} />
+                    </button>
                   )}
-                ></span>
-              </label>
-              <span className="ml-2 text-xs font-medium text-indigo-900">
-                {isReadOnly ? "Read-Only" : "Editable"}
-              </span>
+                </div>
+              )}
             </div>
 
+            {/* Toggle + label (stays with title on mobile) */}
+            <div className="ml-0 md:ml-4 flex items-center gap-2">
+              <label htmlFor="readOnlyToggle" className={cn(
+                "relative block h-6 w-12 rounded-full transition-colors [-webkit-tap-highlight-color:_transparent]",
+                isReadOnly ? "bg-yellow-500" : "bg-green-500"
+              )}>
+                <input type="checkbox" id="readOnlyToggle" className="peer sr-only" checked={!isReadOnly} onChange={handleToggleReadOnly} disabled={isLoading} />
+                <span className={cn("absolute inset-y-0 start-0 m-0.5 size-5 rounded-full bg-white transition-all duration-300", isReadOnly ? "start-0" : "start-6")}></span>
+              </label>
+              <span className="text-xs font-medium text-indigo-900">{isReadOnly ? "Read-Only" : "Editable"}</span>
+            </div>
           </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={handleCustomAnalyze}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-            >
-              Custom Analyze
-            </button>
+          {/* Desktop Actions: hidden on mobile */}
+          <div className="hidden md:flex gap-2">
+            <button onClick={handleCustomAnalyze} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">Custom Analyze</button>
+            <button onClick={openCategoryModal} className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600">Change Category</button>
+            <button onClick={() => setShowTransformModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Create Changes in Data through AI</button>
+            <button onClick={handleSaveChanges} disabled={isLoading} className="px-4 py-2 bg-green-600 text-white rounded-lg disabled:opacity-50">Save Changes</button>
+          </div>
 
-            {/* New Change Category button */}
-            <button
-              onClick={openCategoryModal}
-              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
-            >
-              Change Category
-            </button>
-
-            <button
-              onClick={() => setShowTransformModal(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Create Changes in Data through AI
-            </button>
-
-            <button
-              onClick={handleSaveChanges}
-              disabled={isLoading}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg disabled:opacity-50"
-            >
-              Save Changes
-            </button>
+          {/* Mobile Actions: visible only on small screens.
+              Two compact groups so they don't overflow vertically too long.
+              Sticky behavior helps them remain visible when the user scrolls the page on mobile. */}
+          <div className="w-full md:hidden sticky top-0 bg-gray-200/80 dark:bg-gray-200/60 backdrop-blur-sm z-30 px-3 py-2 rounded-lg flex flex-col gap-2">
+            <div className="flex gap-2 justify-between">
+              <button onClick={handleCustomAnalyze} className="flex-1 px-3 py-2 text-sm rounded bg-purple-600 text-white">Custom</button>
+              <button onClick={openCategoryModal} className="flex-1 px-3 py-2 text-sm rounded bg-orange-500 text-white">Category</button>
+            </div>
+            <div className="flex gap-2 justify-between">
+              <button onClick={() => setShowTransformModal(true)} className="flex-1 px-3 py-2 text-sm rounded bg-blue-600 text-white">Transform</button>
+              <button onClick={handleSaveChanges} disabled={isLoading} className="flex-1 px-3 py-2 text-sm rounded bg-green-600 text-white disabled:opacity-50">Save</button>
+            </div>
           </div>
         </div>
 
@@ -1273,7 +1232,6 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
           </div>
         )}
 
-
         {showAddColumnModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white p-6 rounded-lg w-full max-w-2xl">
@@ -1333,7 +1291,6 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
             </div>
           </div>
         )}
-
 
         {columnToRemove && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -1408,12 +1365,12 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
           )}
           {error && <div className="text-center text-red-600 mb-4">{error}</div>}
           {!isLoading && !error && (
-            <div className="relative overflow-x-auto shadow-md sm:rounded-lg block max-h-[70vh] overflow-y-auto">
-              <table className="min-w-full text-sm text-left text-gray-500">
-                <thead className="sticky top-0 text-xs text-gray-700 uppercase bg-gray-50 z-10">
+            <div className="relative overflow-x-auto shadow-md sm:rounded-lg px-4 max-w-full bg-white">
+              <table className="min-w-full text-sm text-left text-gray-700 table-fixed ">
+                <thead className="sticky top-0 text-xs text-gray-700 uppercase  z-10">
                   <tr>
                     {columns.map((header) => (
-                      <th key={header} className="px-6 py-3 group relative">
+                      <th key={header} className="px-6 py-3 group relative bg-white">
                         {header}
                         {!isReadOnly && (
                           <button

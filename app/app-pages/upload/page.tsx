@@ -391,7 +391,7 @@ function FileUploadDemoContent({ isPriceList }: { isPriceList: boolean }) {
                                     </div>
                                 </ModalTrigger>
                                 <ModalBody>
-                                    <ModalContent>
+                                    <ModalContent className="max-h-[65vh] overflow-y-auto pr-2 pb-4">
                                         <h4 className="text-lg md:text-2xl text-neutral-600 font-bold text-center mb-8">
                                             Help us understand your {" "}
                                             <span className="px-1 py-0.5 rounded-md bg-gray-100 border border-gray-200">
