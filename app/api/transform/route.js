@@ -204,8 +204,9 @@ async function processFileData(buffer, filename, contentType) {
 
 export async function POST(request) {
     const uri = process.env.MONGODB_URI;
-    const VERTEX_AI_PROJECT = process.env.VERTEX_AI_PROJECT;
-    const VERTEX_AI_LOCATION = process.env.VERTEX_AI_LOCATION;
+    // trim env vars to avoid trailing-space mismatches
+    const VERTEX_AI_PROJECT = (process.env.VERTEX_AI_PROJECT || 'neural-land-469712-t7').toString().trim();
+    const VERTEX_AI_LOCATION = (process.env.VERTEX_AI_LOCATION || 'us-central1').toString().trim();
 
     if (!uri) {
         return NextResponse.json(
@@ -226,7 +227,7 @@ export async function POST(request) {
     try {
         await client.connect();
         const db = client.db('Project0');
-        const bucket = new GridFSBucket(db, { bucketName: 'excelFiles' }); // Fixed missing quote
+        const bucket = new GridFSBucket(db, { bucketName: 'excelFiles' });
 
         const { searchParams } = new URL(request.url);
         const fileId = searchParams.get('fileId');
@@ -268,22 +269,23 @@ export async function POST(request) {
             return NextResponse.json({ error: 'No valid data found' }, { status: 400 });
         }
 
-        // Initialize Vertex AI
+        // Initialize Vertex AI with trimmed envs and explicit apiEndpoint
         const vertexAI = new VertexAI({
             project: VERTEX_AI_PROJECT,
             location: VERTEX_AI_LOCATION,
+            apiEndpoint: `${VERTEX_AI_LOCATION}-aiplatform.googleapis.com`,
         });
 
-        // Use Gemini 2.5 Flash Lite model
-        const model = vertexAI.preview.getGenerativeModel({
+        // Use Gemini 2.5 Flash Lite model (same approach as other modules)
+        const model = vertexAI.getGenerativeModel({
             model: "gemini-2.5-flash-lite"
         });
 
         // Generate transformation prompt
         const dataString = JSON.stringify({ columns, data }, null, 2);
         const defaultPrompt = `Transform the data according to the user's instructions. 
-      Output ONLY a valid JSON array of objects representing the transformed data. 
-      Do not include any explanations or markdown.`;
+Output ONLY a valid JSON array of objects representing the transformed data. 
+Do not include any explanations or markdown.`;
 
         const aiPrompt = prompt
             ? `${prompt}\n\nOriginal Data:\n${dataString}\n\n${defaultPrompt}`

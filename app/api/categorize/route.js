@@ -70,8 +70,8 @@ export async function GET(request) {
 
     // 3) Connect to Mongo
     const uri = process.env.MONGODB_URI;
-    const VERTEX_AI_PROJECT = process.env.VERTEX_AI_PROJECT;
-    const VERTEX_AI_LOCATION = process.env.VERTEX_AI_LOCATION;
+    const VERTEX_AI_PROJECT = (process.env.VERTEX_AI_PROJECT || '').toString().trim();
+    const VERTEX_AI_LOCATION = (process.env.VERTEX_AI_LOCATION || '').toString().trim();
 
     if (!uri || !VERTEX_AI_PROJECT || !VERTEX_AI_LOCATION) {
         return NextResponse.json(
@@ -126,7 +126,8 @@ export async function GET(request) {
 
         // 6) Parse Excel/CSV
         const workbook = new ExcelJS.Workbook();
-        if (file.filename.toLowerCase().endsWith('.csv')) {
+        if ((file.filename || '').toLowerCase().endsWith('.csv')) {
+            // ExcelJS CSV read expects a stream/string - this preserves your original approach
             await workbook.csv.read(buffer.toString());
         } else {
             await workbook.xlsx.load(buffer);
@@ -134,11 +135,11 @@ export async function GET(request) {
         const sheet = workbook.worksheets[0];
 
         // 7) Extract headers & sample rows
-        const headers = sheet.getRow(1).values.slice(1).map(String);
+        const headers = (sheet.getRow(1).values || []).slice(1).map(String);
         const sampleRows = [];
         for (let i = 2; i <= Math.min(6, sheet.rowCount); i++) {
             sampleRows.push(
-                sheet.getRow(i).values.slice(1).map(cell =>
+                (sheet.getRow(i).values || []).slice(1).map(cell =>
                     cell?.toString?.() || ''
                 )
             );
@@ -228,18 +229,19 @@ ${sampleRows.map((row, i) => `Row ${i + 1}: ${JSON.stringify(row)}`).join('\n')}
 
 YOUR RESPONSE (JSON ONLY):`;
 
-        // Initialize Vertex AI
+        // Initialize Vertex AI (trim envs and explicit apiEndpoint)
         const vertexAI = new VertexAI({
             project: VERTEX_AI_PROJECT,
             location: VERTEX_AI_LOCATION,
+            apiEndpoint: `${VERTEX_AI_LOCATION}-aiplatform.googleapis.com`,
         });
 
-        // Use Gemini 2.5 Flash Lite model
-        const model = vertexAI.preview.getGenerativeModel({
+        // Use Gemini 2.5 Flash Lite model with low temperature for deterministic JSON
+        const model = vertexAI.getGenerativeModel({
             model: "gemini-2.5-flash-lite",
             generationConfig: {
-                temperature: 0.1, // Lower temperature for more deterministic responses
-                maxOutputTokens: 200, // Limit output to just the JSON we need
+                temperature: 0.1,
+                maxOutputTokens: 200,
             }
         });
 
@@ -254,7 +256,7 @@ YOUR RESPONSE (JSON ONLY):`;
 
         let result;
         try {
-            result = await model.generateContent(vertexRequest);
+            result = await model.generateContent(vertexRequest, { signal: controller.signal });
             clearTimeout(timeout);
         } catch (error) {
             clearTimeout(timeout);

@@ -134,8 +134,8 @@ function parseAIResponse(response) {
 export async function POST(request) {
     let sessionId = null;
     const uri = process.env.MONGODB_URI;
-    const VERTEX_AI_PROJECT = process.env.VERTEX_AI_PROJECT;
-    const VERTEX_AI_LOCATION = process.env.VERTEX_AI_LOCATION;
+    const VERTEX_AI_PROJECT = (process.env.VERTEX_AI_PROJECT || '').toString().trim();
+    const VERTEX_AI_LOCATION = (process.env.VERTEX_AI_LOCATION || '').toString().trim();
 
     if (!uri) {
         return NextResponse.json(
@@ -235,7 +235,7 @@ export async function POST(request) {
             const workbook = new ExcelJS.Workbook();
 
             // FIX: Convert buffer to stream for CSV processing
-            if (file.filename.toLowerCase().endsWith('.csv')) {
+            if ((file.filename || '').toLowerCase().endsWith('.csv')) {
                 // Create stream from buffer
                 const bufferStream = new Readable();
                 bufferStream.push(buffer);
@@ -320,14 +320,15 @@ COLUMN STANDARDIZATION PRINCIPLES:
 
         console.log('Sending request to Vertex AI API...');
 
-        // Initialize Vertex AI
+        // Initialize Vertex AI (trimmed envs and explicit apiEndpoint)
         const vertexAI = new VertexAI({
             project: VERTEX_AI_PROJECT,
             location: VERTEX_AI_LOCATION,
+            apiEndpoint: `${VERTEX_AI_LOCATION}-aiplatform.googleapis.com`,
         });
 
-        // Use Gemini 2.5 Flash Lite model
-        const model = vertexAI.preview.getGenerativeModel({
+        // Use Gemini 2.5 Flash Lite model (same approach)
+        const model = vertexAI.getGenerativeModel({
             model: "gemini-2.5-flash-lite"
         });
 
@@ -343,7 +344,7 @@ COLUMN STANDARDIZATION PRINCIPLES:
 
         let result;
         try {
-            result = await model.generateContent(vertexRequest);
+            result = await model.generateContent(vertexRequest, { signal: controller.signal });
             clearTimeout(aiTimeout);
             clearTimeout(vercelTimeout);
         } catch (error) {
@@ -447,6 +448,7 @@ COLUMN STANDARDIZATION PRINCIPLES:
         processingLocks.delete(sessionId);
 
         try {
+            // categorizeFile may be defined elsewhere in your codebase
             await categorizeFile(uploadStream.id.toString(), userId);
         } catch (err) {
             console.error('Combined file categorization error:', err);
@@ -465,7 +467,7 @@ COLUMN STANDARDIZATION PRINCIPLES:
         processingLocks.delete(sessionId);
 
         // Special handling for timeouts
-        if (error.name === 'AbortError') {
+        if (error && error.name === 'AbortError') {
             console.error('Request timed out after', Date.now() - startTime, 'ms');
             return NextResponse.json(
                 { error: "Processing timeout. Try smaller datasets or simpler operations." },
