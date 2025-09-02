@@ -136,7 +136,7 @@ export async function POST(request) {
         for await (const chunk of downloadStream) chunks.push(chunk);
         const buffer = Buffer.concat(chunks);
 
-        // Process file data (we still parse file for preview/storage but won't send it to Vertex)
+        // Process file data (we still parse file for preview/storage and to include in the prompt)
         const filename = file.filename || 'unknown';
         const contentType = file.contentType || 'application/octet-stream';
         const { columns, data } = await processFileData(buffer, filename, contentType);
@@ -160,11 +160,12 @@ export async function POST(request) {
             }
         }
 
-        // ---------- MINIMAL CHANGE: Send ONLY the user's prompt to Vertex AI ----------
+        // ---------- SEND BOTH: user's prompt + parsed data ----------
         if (!customPrompt || !customPrompt.toString().trim()) {
             return NextResponse.json({ error: 'Missing prompt in request body' }, { status: 400 });
         }
-        const prompt = customPrompt.toString().trim();
+        const dataString = JSON.stringify({ columns, data }, null, 2);
+        const prompt = `${customPrompt.toString().trim()}\n\nData:\n${dataString}`;
 
         const model = vertexAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
 
@@ -176,7 +177,6 @@ export async function POST(request) {
             console.log('Vertex AI result (raw):', JSON.stringify(result, null, 2));
         } catch (vErr) {
             console.error('Vertex AI generateContent error:', vErr);
-            // Throw to be caught by outer catch and returned as 500 with details
             throw vErr;
         }
 
