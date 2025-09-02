@@ -5,36 +5,21 @@ import * as XLSX from 'xlsx';
 import { NextResponse } from 'next/server';
 import { VertexAI } from '@google-cloud/vertexai';
 
-// Prevent static analysis during build
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
 
+// Initialize Vertex AI with proper configuration
 let vertexAI;
-let vertexAIInitialized = false;
-
-const initializeVertexAI = () => {
-    try {
-        // Use environment variables with proper fallbacks
-        const projectId = process.env.VERTEX_AI_PROJECT || 'neural-land-469712-t7';
-        const location = process.env.VERTEX_AI_LOCATION || 'us-central1';
-
-        console.log(`Initializing Vertex AI with project: ${projectId}, location: ${location}`);
-
-        vertexAI = new VertexAI({
-            project: projectId,
-            location: location,
-            apiEndpoint: `${location}-aiplatform.googleapis.com`, // Dynamic endpoint
-        });
-
-        vertexAIInitialized = true;
-        console.log('Vertex AI initialized successfully');
-    } catch (error) {
-        console.error('Vertex AI initialization error:', error);
-        vertexAIInitialized = false;
-    }
-};
-
-initializeVertexAI();
+try {
+    vertexAI = new VertexAI({
+        project: process.env.VERTEX_AI_PROJECT || 'neural-land-469712-t7',
+        location: process.env.VERTEX_AI_LOCATION || 'us-central1',
+        // Explicit API endpoint for production stability
+        apiEndpoint: 'us-central1-aiplatform.googleapis.com'
+    });
+    console.log('Vertex AI initialized successfully');
+} catch (error) {
+    console.error('Vertex AI initialization error:', error);
+}
 
 async function processFileData(buffer, filename, contentType) {
     let columns = [];
@@ -108,6 +93,8 @@ async function processFileData(buffer, filename, contentType) {
 
 export async function POST(request) {
     const uri = process.env.MONGODB_URI;
+    const VERTEX_AI_PROJECT = process.env.VERTEX_AI_PROJECT;
+    const VERTEX_AI_LOCATION = process.env.VERTEX_AI_LOCATION;
 
     if (!uri) {
         return NextResponse.json(
@@ -116,16 +103,11 @@ export async function POST(request) {
         );
     }
 
-    // Reinitialize Vertex AI if not initialized
-    if (!vertexAIInitialized) {
-        initializeVertexAI();
-
-        if (!vertexAIInitialized) {
-            return NextResponse.json(
-                { error: 'Vertex AI failed to initialize. Check project ID and permissions.' },
-                { status: 500 }
-            );
-        }
+    if (!VERTEX_AI_PROJECT || !VERTEX_AI_LOCATION) {
+        return NextResponse.json(
+            { error: 'Vertex AI configuration missing in environment variables' },
+            { status: 500 }
+        );
     }
 
     const client = new MongoClient(uri);
@@ -146,7 +128,7 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Invalid file ID' }, { status: 400 });
         }
 
-        // Get file metadata with size check
+        // Get file metadata
         const filesCollection = db.collection('excelFiles.files');
         const file = await filesCollection.findOne({
             _id: new ObjectId(fileId),
@@ -155,32 +137,10 @@ export async function POST(request) {
 
         if (!file) return NextResponse.json({ error: 'File not found' }, { status: 404 });
 
-        // Check file size before processing (10MB limit for App Engine)
-        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-        if (file.length > MAX_FILE_SIZE) {
-            return NextResponse.json(
-                { error: 'File size exceeds the 10MB limit for processing' },
-                { status: 400 }
-            );
-        }
-
-        // Download file content with memory monitoring
+        // Download file content
         const downloadStream = bucket.openDownloadStream(new ObjectId(fileId));
         const chunks = [];
-        let totalSize = 0;
-
-        for await (const chunk of downloadStream) {
-            chunks.push(chunk);
-            totalSize += chunk.length;
-
-            // Check memory usage during download to prevent overflow
-            if (totalSize > MAX_FILE_SIZE) {
-                return NextResponse.json(
-                    { error: 'File processing exceeded memory limits' },
-                    { status: 400 }
-                );
-            }
-        }
+        for await (const chunk of downloadStream) chunks.push(chunk);
         const buffer = Buffer.concat(chunks);
 
         // Process file data
@@ -197,7 +157,12 @@ export async function POST(request) {
             return NextResponse.json({ error: 'No valid data found' }, { status: 400 });
         }
 
-        // Use the model with enhanced configuration
+        // Check if Vertex AI was initialized properly
+        if (!vertexAI) {
+            throw new Error('Vertex AI not initialized');
+        }
+
+        // Use the latest model API (not preview)
         const model = vertexAI.getGenerativeModel({
             model: "gemini-2.5-flash-lite",
             generationConfig: {
@@ -207,23 +172,18 @@ export async function POST(request) {
             },
         });
 
-        // Generate AI analysis with optimized data size - limit to 20 rows
-        const dataForAnalysis = {
-            columns,
-            data: data.slice(0, 20) // Reduced from 50 to 20 rows to prevent overload
-        };
-
-        const dataString = JSON.stringify(dataForAnalysis, null, 2);
+        // Generate AI analysis
+        const dataString = JSON.stringify({ columns, data }, null, 2);
         const defaultPrompt = `Analyze this CRM data and provide insights on customer trends, 
-                        opportunities, and key patterns. Include actionable recommendations.`;
+                            opportunities, and key patterns. Include actionable recommendations.`;
 
         const prompt = customPrompt
             ? `${customPrompt}\n\nData:\n${dataString}`
             : `${defaultPrompt}\n\nData:\n${dataString}`;
 
-        // Vertex AI request with enhanced error handling
+        // Vertex AI request with timeout
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 45000); // 45 second timeout
+        const timeout = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
         try {
             const result = await model.generateContent({
@@ -256,30 +216,19 @@ export async function POST(request) {
 
         } catch (vertexError) {
             if (vertexError.name === 'AbortError') {
-                throw new Error('Vertex AI request timed out after 45 seconds');
+                throw new Error('Vertex AI request timed out after 30 seconds');
             }
-
-            console.error('Vertex AI API Error Details:', {
-                message: vertexError.message,
-                code: vertexError.code,
-                status: vertexError.status,
-                details: vertexError.details
-            });
-
+            console.error('Vertex AI API Error:', vertexError);
             throw new Error(`Vertex AI processing failed: ${vertexError.message}`);
         }
 
     } catch (error) {
-        console.error('Full Analysis Error:', {
-            message: error.message,
-            stack: error.stack,
-            name: error.name
-        });
-
+        console.error('Analysis Error:', error);
         return NextResponse.json(
             {
                 error: 'Internal server error',
-                details: process.env.NODE_ENV === 'development' ? error.message : 'Processing failed. Please try again.',
+                details: error.message,
+                // Include more details for debugging in production
                 ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
             },
             { status: 500 }
