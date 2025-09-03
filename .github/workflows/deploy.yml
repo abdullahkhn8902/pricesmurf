@@ -52,12 +52,6 @@ jobs:
           project_id: neural-land-469712-t7
           export_default_credentials: true
 
-      # Copy monitoring files to a temporary location for Cloud Build
-      - name: Prepare monitoring files
-        run: |
-          cp monitoring-dashboard.json monitoring-dashboard.json
-          cp alerts.yaml alerts.yaml
-          cp notification-channel.json notification-channel.json
 
       - name: Submit Cloud Build (build + deploy + monitoring)
         run: |
