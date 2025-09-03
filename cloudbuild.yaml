@@ -44,35 +44,6 @@ steps:
       # Deploy the modified YAML
       gcloud app deploy app.deploy.yaml --project=neural-land-469712-t7 --quiet
 
-# Add monitoring setup steps after deployment
-- name: 'gcr.io/cloud-builders/gcloud'
-  id: setup-monitoring
-  entrypoint: 'bash'
-  args:
-    - '-c'
-    - |
-      # Create monitoring dashboard
-      if [ -f monitoring-dashboard.json ]; then
-        gcloud monitoring dashboards create --config-from-file=monitoring-dashboard.json --project=neural-land-469712-t7 || echo "Dashboard may already exist"
-      fi
-      
-      # Create alerting policies (replace with your notification channel ID)
-      if [ -f alerts.yaml ]; then
-        # First, get or create a notification channel
-        CHANNEL_ID=$(gcloud alpha monitoring channels list --filter='displayName="PriceSmurf Alerts"' --format='value(name)' --project=neural-land-469712-t7)
-        
-        if [ -z "$CHANNEL_ID" ]; then
-          # Create a notification channel if it doesn't exist
-          echo "Creating notification channel..."
-          CHANNEL_ID=$(gcloud alpha monitoring channels create --channel-content-from-file=notification-channel.json --project=neural-land-469712-t7 --format='value(name)')
-        fi
-        
-        # Replace placeholder in alerts.yaml
-        sed -i "s|\[YOUR_CHANNEL_ID\]|$CHANNEL_ID|g" alerts.yaml
-        
-        # Create alert policies
-        gcloud alpha monitoring policies create --policy-from-file=alerts.yaml --project=neural-land-469712-t7 || echo "Policies may already exist"
-      fi
 
 availableSecrets:
   secretManager:
