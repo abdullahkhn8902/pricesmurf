@@ -327,7 +327,6 @@ COLUMN STANDARDIZATION PRINCIPLES:
             apiEndpoint: `${VERTEX_AI_LOCATION}-aiplatform.googleapis.com`,
         });
 
-        // Use Gemini 2.5 Flash Lite model (same approach)
         const model = vertexAI.getGenerativeModel({
             model: "gemini-2.5-flash-lite"
         });

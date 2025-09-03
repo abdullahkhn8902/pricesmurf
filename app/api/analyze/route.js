@@ -5,6 +5,9 @@ import * as XLSX from 'xlsx';
 import { NextResponse } from 'next/server';
 import { VertexAI } from '@google-cloud/vertexai';
 
+// Import the logger utility correctly
+import logger from '@/lib/logger';
+
 export const dynamic = 'force-dynamic';
 
 // Initialize Vertex AI with proper configuration (trim env values)
@@ -19,9 +22,9 @@ try {
         location: LOCATION,
         apiEndpoint: API_ENDPOINT,
     });
-    console.log('Vertex AI initialized successfully');
+    logger.info('Vertex AI initialized successfully', { project: PROJECT, location: LOCATION });
 } catch (error) {
-    console.error('Vertex AI initialization error:', error);
+    logger.error('Vertex AI initialization error', { error: error.message });
 }
 
 async function processFileData(buffer, filename, contentType) {
@@ -91,15 +94,29 @@ async function processFileData(buffer, filename, contentType) {
 }
 
 export async function POST(request) {
+    // Get request ID from headers for tracing
+    const requestId = request.headers.get('x-request-id') || 'unknown';
+    const userId = request.headers.get('x-clerk-user-id') || 'unknown';
+
+    // Log the start of the request
+    logger.info('API request received', {
+        request_id: requestId,
+        user_id: userId,
+        path: request.url,
+        method: 'POST'
+    });
+
     const uri = process.env.MONGODB_URI;
     const VERTEX_AI_PROJECT = (process.env.VERTEX_AI_PROJECT || 'neural-land-469712-t7').toString().trim();
     const VERTEX_AI_LOCATION = (process.env.VERTEX_AI_LOCATION || 'us-central1').toString().trim();
 
     if (!uri) {
+        logger.error('MongoDB URI missing', { request_id: requestId, user_id: userId });
         return NextResponse.json({ error: 'MONGODB_URI missing in environment variables' }, { status: 500 });
     }
 
     if (!VERTEX_AI_PROJECT || !VERTEX_AI_LOCATION) {
+        logger.error('Vertex AI configuration missing', { request_id: requestId, user_id: userId });
         return NextResponse.json({ error: 'Vertex AI configuration missing in environment variables' }, { status: 500 });
     }
 
@@ -107,6 +124,8 @@ export async function POST(request) {
 
     try {
         await client.connect();
+        logger.info('MongoDB connected successfully', { request_id: requestId, user_id: userId });
+
         const db = client.db('Project0');
         const bucket = new GridFSBucket(db, { bucketName: 'excelFiles' });
 
@@ -114,10 +133,15 @@ export async function POST(request) {
         const fileId = searchParams.get('fileId');
         const { customPrompt } = await request.json();
 
-        const { userId } = await auth();
-        if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        // Verify authentication with Clerk
+        const { userId: clerkUserId } = await auth();
+        if (!clerkUserId) {
+            logger.warning('Unauthorized access attempt', { request_id: requestId });
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
 
         if (!fileId || !ObjectId.isValid(fileId)) {
+            logger.warning('Invalid file ID provided', { request_id: requestId, user_id: clerkUserId, file_id: fileId });
             return NextResponse.json({ error: 'Invalid file ID' }, { status: 400 });
         }
 
@@ -125,27 +149,46 @@ export async function POST(request) {
         const filesCollection = db.collection('excelFiles.files');
         const file = await filesCollection.findOne({
             _id: new ObjectId(fileId),
-            'metadata.userId': userId
+            'metadata.userId': clerkUserId
         });
 
-        if (!file) return NextResponse.json({ error: 'File not found' }, { status: 404 });
+        if (!file) {
+            logger.warning('File not found', { request_id: requestId, user_id: clerkUserId, file_id: fileId });
+            return NextResponse.json({ error: 'File not found' }, { status: 404 });
+        }
 
-        // Download file content (kept so we can return preview and store analysis tied to file)
+        logger.info('File found, downloading content', {
+            request_id: requestId,
+            user_id: clerkUserId,
+            file_id: fileId,
+            filename: file.filename
+        });
+
+        // Download file content
         const downloadStream = bucket.openDownloadStream(new ObjectId(fileId));
         const chunks = [];
         for await (const chunk of downloadStream) chunks.push(chunk);
         const buffer = Buffer.concat(chunks);
 
-        // Process file data (we still parse file for preview/storage and to include in the prompt)
+        // Process file data
         const filename = file.filename || 'unknown';
         const contentType = file.contentType || 'application/octet-stream';
         const { columns, data } = await processFileData(buffer, filename, contentType);
 
         if (!columns.length || !data.length) {
+            logger.warning('No valid data found in file', { request_id: requestId, user_id: clerkUserId, file_id: fileId });
             return NextResponse.json({ error: 'No valid data found' }, { status: 400 });
         }
 
-        // Ensure vertexAI is initialized; if not, try a minimal late-init
+        logger.info('File processed successfully', {
+            request_id: requestId,
+            user_id: clerkUserId,
+            file_id: fileId,
+            columns_count: columns.length,
+            rows_count: data.length
+        });
+
+        // Ensure vertexAI is initialized
         if (!vertexAI) {
             try {
                 vertexAI = new VertexAI({
@@ -153,30 +196,47 @@ export async function POST(request) {
                     location: VERTEX_AI_LOCATION,
                     apiEndpoint: `${VERTEX_AI_LOCATION}-aiplatform.googleapis.com`,
                 });
-                console.log('Vertex AI late-init successful');
+                logger.info('Vertex AI late-init successful', { request_id: requestId, user_id: clerkUserId });
             } catch (initErr) {
-                console.error('Vertex AI late-init error:', initErr);
+                logger.error('Vertex AI late-init error', {
+                    request_id: requestId,
+                    user_id: clerkUserId,
+                    error: initErr.message
+                });
                 throw new Error('Vertex AI not initialized and late-init failed');
             }
         }
 
-        // ---------- SEND BOTH: user's prompt + parsed data ----------
+        // Validate custom prompt
         if (!customPrompt || !customPrompt.toString().trim()) {
+            logger.warning('Missing prompt in request', { request_id: requestId, user_id: clerkUserId });
             return NextResponse.json({ error: 'Missing prompt in request body' }, { status: 400 });
         }
+
+        // Prepare prompt for Vertex AI
         const dataString = JSON.stringify({ columns, data }, null, 2);
         const prompt = `${customPrompt.toString().trim()}\n\nData:\n${dataString}`;
 
         const model = vertexAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+
+        logger.info('Calling Vertex AI', {
+            request_id: requestId,
+            user_id: clerkUserId,
+            model: 'gemini-2.5-flash-lite'
+        });
 
         let result;
         try {
             result = await model.generateContent({
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
             });
-            console.log('Vertex AI result (raw):', JSON.stringify(result, null, 2));
+            logger.info('Vertex AI call successful', { request_id: requestId, user_id: clerkUserId });
         } catch (vErr) {
-            console.error('Vertex AI generateContent error:', vErr);
+            logger.error('Vertex AI generateContent error', {
+                request_id: requestId,
+                user_id: clerkUserId,
+                error: vErr.message
+            });
             throw vErr;
         }
 
@@ -185,12 +245,26 @@ export async function POST(request) {
 
         // Store analysis in DB
         await db.collection('analyses').updateOne(
-            { fileId: new ObjectId(fileId), userId },
+            { fileId: new ObjectId(fileId), userId: clerkUserId },
             { $set: { analysis, updatedAt: new Date() } },
             { upsert: true }
         );
 
+        logger.info('Analysis stored in database', {
+            request_id: requestId,
+            user_id: clerkUserId,
+            file_id: fileId
+        });
+
         const sheetName = filename.includes('.') ? filename.split('.')[0] : 'Unnamed Sheet';
+
+        // Log successful completion
+        logger.info('API request completed successfully', {
+            request_id: requestId,
+            user_id: clerkUserId,
+            file_id: fileId,
+            analysis_length: analysis.length
+        });
 
         return NextResponse.json({
             sheetName,
@@ -200,7 +274,13 @@ export async function POST(request) {
         }, { status: 200 });
 
     } catch (error) {
-        console.error('Analysis Error (POST):', error);
+        logger.error('API processing error', {
+            request_id: requestId,
+            user_id: userId,
+            error: error.message,
+            stack: error.stack
+        });
+
         return NextResponse.json({
             error: 'Internal server error',
             details: error?.message || String(error),
@@ -208,5 +288,6 @@ export async function POST(request) {
         }, { status: 500 });
     } finally {
         await client.close();
+        logger.info('Database connection closed', { request_id: requestId, user_id: userId });
     }
 }

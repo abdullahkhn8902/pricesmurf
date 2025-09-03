@@ -1,0 +1,36 @@
+combiner: OR
+conditions:
+- conditionThreshold:
+    aggregations:
+    - alignmentPeriod: 60s
+      perSeriesAligner: ALIGN_RATE
+    comparison: COMPARISON_GT
+    duration: 300s
+    filter: 'metric.type="run.googleapis.com/request_count" AND resource.type="cloud_run_revision" AND metric.labels.response_code_class="5XX"'
+    thresholdValue: 0.05
+    trigger:
+      count: 1
+  displayName: High error rate
+- conditionThreshold:
+    aggregations:
+    - alignmentPeriod: 60s
+      perSeriesAligner: ALIGN_50TH_PERCENTILE
+    comparison: COMPARISON_GT
+    duration: 300s
+    filter: 'metric.type="run.googleapis.com/request_latencies" AND resource.type="cloud_run_revision"'
+    thresholdValue: 1000
+    trigger:
+      count: 1
+  displayName: High latency
+- conditionThreshold:
+    aggregations:
+    - alignmentPeriod: 60s
+      perSeriesAligner: ALIGN_MEAN
+    comparison: COMPARISON_GT
+    duration: 300s
+    filter: 'metric.type="run.googleapis.com/container/cpu/utilizations" AND resource.type="cloud_run_revision"'
+    thresholdValue: 0.8
+    trigger:
+      count: 1
+  displayName: High CPU utilization
+displayName: PriceSmurf Alert Policy
