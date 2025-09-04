@@ -93,6 +93,13 @@ async function processFileData(buffer, filename, contentType) {
     return { columns, data };
 }
 
+// --- Small helper for safe/masked logging of secrets ---
+function maskSecret(secret){
+  if(!secret || typeof secret !== 'string') return 'N/A';
+  if(secret.length <= 4) return '***' + secret;
+  return '***' + secret.slice(-4);
+}
+
 export async function POST(request) {
     // Get request ID from headers for tracing
     const requestId = request.headers.get('x-request-id') || 'unknown';
@@ -225,23 +232,58 @@ export async function POST(request) {
             model: 'gemini-2.5-flash-lite'
         });
 
+        // --- Start: safe, minimal telemetry around Vertex call (DO NOT log full secrets) ---
+        const startTs = Date.now();
+        logger.info('vertex_call_start', {
+            request_id: requestId,
+            user_id: clerkUserId,
+            model: 'gemini-2.5-flash-lite',
+            masked_token: maskSecret(process.env.VERTEX_AI_KEY || process.env.GOOGLE_APPLICATION_CREDENTIALS || 'sa-key'),
+            note: 'vertex_call_start'
+        });
+
         let result;
         try {
             result = await model.generateContent({
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
             });
+
+            // keep the existing success log you had
             logger.info('Vertex AI call successful', { request_id: requestId, user_id: clerkUserId });
         } catch (vErr) {
-            logger.error('Vertex AI generateContent error', {
+            const durationMs = Date.now() - startTs;
+            // log a structured error entry (safe)
+            logger.error('vertex_call_error', {
                 request_id: requestId,
                 user_id: clerkUserId,
-                error: vErr.message
+                model: 'gemini-2.5-flash-lite',
+                duration_ms: durationMs,
+                error: vErr?.message || String(vErr),
+                note: 'vertex_call_error'
             });
+            // rethrow to preserve your existing error behavior
             throw vErr;
         }
+        // --- End: wrapper around Vertex call ---
 
         const response = result?.response;
         const analysis = response?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'No analysis generated';
+
+        // Log a final "end" event with duration and analysis length
+        try {
+            const durationMs = Date.now() - startTs;
+            logger.info('vertex_call_end', {
+                request_id: requestId,
+                user_id: clerkUserId,
+                model: 'gemini-2.5-flash-lite',
+                duration_ms: durationMs,
+                analysis_length: analysis.length,
+                note: 'vertex_call_end'
+            });
+        } catch (logErr) {
+            // non-fatal logging failure should not break main flow
+            logger.error('vertex_call_end_logging_error', { request_id: requestId, error: logErr?.message || String(logErr) });
+        }
 
         // Store analysis in DB
         await db.collection('analyses').updateOne(
