@@ -94,10 +94,10 @@ async function processFileData(buffer, filename, contentType) {
 }
 
 // --- Small helper for safe/masked logging of secrets ---
-function maskSecret(secret){
-  if(!secret || typeof secret !== 'string') return 'N/A';
-  if(secret.length <= 4) return '***' + secret;
-  return '***' + secret.slice(-4);
+function maskSecret(secret) {
+    if (!secret || typeof secret !== 'string') return 'N/A';
+    if (secret.length <= 4) return '***' + secret;
+    return '***' + secret.slice(-4);
 }
 
 export async function POST(request) {
@@ -248,8 +248,36 @@ export async function POST(request) {
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
             });
 
-            // keep the existing success log you had
-            logger.info('Vertex AI call successful', { request_id: requestId, user_id: clerkUserId });
+            // Pull the aggregated response object that the Node SDK returns
+            const responseFromModel = result?.response || null;
+
+            // The official REST/SDK provides usage metadata under usageMetadata (camelCase),
+            // but some shapes (or older SDKs) might nest differently, so be tolerant:
+            const usage = responseFromModel?.usageMetadata
+                ?? responseFromModel?.usage_metadata
+                ?? responseFromModel?.usage
+                ?? null;
+
+            // Normalize token counts (support a few possible field namings)
+            const promptTokens = usage?.promptTokenCount ?? usage?.prompt_token_count ?? usage?.prompt_tokens ?? null;
+            const candidatesTokens = usage?.candidatesTokenCount ?? usage?.candidates_token_count ?? usage?.candidates_tokens ?? null;
+            const totalTokens = usage?.totalTokenCount ?? usage?.total_token_count ?? (Number(promptTokens) + Number(candidatesTokens) || null);
+
+            const durationMs = Date.now() - startTs;
+
+            // Log the usage as structured fields (safe; no secrets)
+            logger.info('Vertex AI call successful', {
+                request_id: requestId,
+                user_id: clerkUserId,
+                model: 'gemini-2.5-flash-lite',
+                duration_ms: durationMs,
+                prompt_tokens: promptTokens,
+                candidates_tokens: candidatesTokens,
+                total_tokens: totalTokens,
+                // include raw usage only in dev to help debugging if shapes differ
+                usage_raw: process.env.NODE_ENV === 'development' ? usage : undefined,
+                note: 'vertex_call_success'
+            });
         } catch (vErr) {
             const durationMs = Date.now() - startTs;
             // log a structured error entry (safe)
@@ -264,6 +292,7 @@ export async function POST(request) {
             // rethrow to preserve your existing error behavior
             throw vErr;
         }
+
         // --- End: wrapper around Vertex call ---
 
         const response = result?.response;
