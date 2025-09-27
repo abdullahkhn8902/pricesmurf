@@ -42,7 +42,7 @@ export default function BackgroundLinesDemo() {
                         Stop Wrestling with your data
                         <br />{" "}
                         <Highlight className="text-white">
-                            Start Winning with AI
+                            Start Winning with PriceSmurf
                         </Highlight>
                         <p className="max-w-xl mx-auto text-sm md:text-lg text-neutral-700 text-center font-light m-5">
                             Merge, edit, delete and analyze every bit of your company data—no more manual clean-ups. Instant AI analysis, fully customizable.
