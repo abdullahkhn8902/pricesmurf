@@ -1,0 +1,11 @@
+{
+    "displayName": "PriceSmurf Alerts",
+    "description": "Notifications for PriceSmurf application alerts",
+    "type": "email",
+    "labels": {
+        "email_address": "mak53797571@gmail.com"
+    },
+    "userLabels": {
+        "application": "pricesmurf"
+    }
+}

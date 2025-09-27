@@ -1,0 +1,12 @@
+runtime: nodejs22
+service: default
+instance_class: F2
+entrypoint: npm run start
+env: standard
+
+automatic_scaling:
+  min_instances: 0
+  max_instances: 2
+  target_cpu_utilization: 0.65
+
+service_account: nextjs-app-sa@neural-land-469712-t7.iam.gserviceaccount.com

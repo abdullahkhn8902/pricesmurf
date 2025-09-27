@@ -1,0 +1,59 @@
+steps:
+- name: 'gcr.io/cloud-builders/gcloud'
+  id: deploy
+  entrypoint: 'bash'
+  secretEnv:
+    - _NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+    - _CLERK_SECRET_KEY
+    - _MONGODB_URI
+    - _VERTEX_AI_PROJECT
+    - _VERTEX_AI_LOCATION
+  args:
+    - '-c'
+    - |
+      set -euo pipefail
+
+      # Use double $$ to escape the $ for Cloud Build parsing
+      export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$$_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+      export CLERK_SECRET_KEY=$$_CLERK_SECRET_KEY
+      export MONGODB_URI=$$_MONGODB_URI
+      export VERTEX_AI_PROJECT=$$_VERTEX_AI_PROJECT
+      export VERTEX_AI_LOCATION=$$_VERTEX_AI_LOCATION
+
+      # Copy your repo app.yaml to a temporary deploy file
+      cp app.yaml app.deploy.yaml
+
+      # Append build_env_variables for build-time environment variables
+      printf 'build_env_variables:\n' >> app.deploy.yaml
+      printf '  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "%s"\n' "$$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" >> app.deploy.yaml
+      printf '  CLERK_SECRET_KEY: "%s"\n' "$$CLERK_SECRET_KEY" >> app.deploy.yaml
+      printf '  MONGODB_URI: "%s"\n' "$$MONGODB_URI" >> app.deploy.yaml
+      printf '  VERTEX_AI_PROJECT: "%s"\n' "$$VERTEX_AI_PROJECT" >> app.deploy.yaml
+      printf '  VERTEX_AI_LOCATION: "%s"\n' "$$VERTEX_AI_LOCATION" >> app.deploy.yaml
+      printf '  GOOGLE_CLOUD_PROJECT: "%s"\n' "neural-land-469712-t7" >> app.deploy.yaml
+
+      # Append env_variables for runtime environment variables
+      printf 'env_variables:\n' >> app.deploy.yaml
+      printf '  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "%s"\n' "$$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" >> app.deploy.yaml
+      printf '  CLERK_SECRET_KEY: "%s"\n' "$$CLERK_SECRET_KEY" >> app.deploy.yaml
+      printf '  MONGODB_URI: "%s"\n' "$$MONGODB_URI" >> app.deploy.yaml
+      printf '  VERTEX_AI_PROJECT: "%s"\n' "$$VERTEX_AI_PROJECT" >> app.deploy.yaml
+      printf '  VERTEX_AI_LOCATION: "%s"\n' "$$VERTEX_AI_LOCATION" >> app.deploy.yaml
+      printf '  GOOGLE_CLOUD_PROJECT: "%s"\n' "neural-land-469712-t7" >> app.deploy.yaml
+
+      # Deploy the modified YAML
+      gcloud app deploy app.deploy.yaml --project=neural-land-469712-t7 --quiet
+
+
+availableSecrets:
+  secretManager:
+    - versionName: "projects/neural-land-469712-t7/secrets/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY/versions/latest"
+      env: "_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
+    - versionName: "projects/neural-land-469712-t7/secrets/CLERK_SECRET_KEY/versions/latest"
+      env: "_CLERK_SECRET_KEY"
+    - versionName: "projects/neural-land-469712-t7/secrets/MONGODB_URI/versions/latest"
+      env: "_MONGODB_URI"
+    - versionName: "projects/neural-land-469712-t7/secrets/VERTEX_AI_PROJECT/versions/latest"
+      env: "_VERTEX_AI_PROJECT"
+    - versionName: "projects/neural-land-469712-t7/secrets/VERTEX_AI_LOCATION/versions/latest"
+      env: "_VERTEX_AI_LOCATION"
