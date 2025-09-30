@@ -1,4 +1,3 @@
-// Simple logger that works in both client and server environments
 export const logger = {
     log: (severity: string, message: any, metadata: Record<string, any> = {}) => {
         const logData = {

@@ -1,4 +1,3 @@
-// app/api/run/count/route.ts
 import { NextResponse } from 'next/server'
 import { getAuth } from '@clerk/nextjs/server'
 import logger from '@/lib/logger'

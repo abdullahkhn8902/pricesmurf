@@ -10,7 +10,6 @@ import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
-// Initialize Vertex AI with proper configuration (trim env values)
 let vertexAI;
 try {
     const PROJECT = (process.env.VERTEX_AI_PROJECT || 'neural-land-469712-t7').toString().trim();

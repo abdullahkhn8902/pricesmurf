@@ -27,7 +27,7 @@ function Navbar({ className }: { className?: string }) {
 
     // Hide navbar on /app-pages/agents and any nested routes like
     // /app-pages/agents/... — change to === if you only want exact match
-    if (pathname === '/app-pages/agents' || pathname?.startsWith('/results')) {
+    if (pathname === '/app-pages/agents' || pathname?.startsWith('/results') || pathname?.startsWith('/margin-results')) {
         return null
     }
 

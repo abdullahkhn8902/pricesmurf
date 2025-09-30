@@ -1,4 +1,3 @@
-// app/api/check-user-data/route.js
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { MongoClient } from 'mongodb';

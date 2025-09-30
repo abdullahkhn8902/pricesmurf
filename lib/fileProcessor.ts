@@ -1,4 +1,3 @@
-// lib/fileProcessor.ts
 import { parse } from 'csv-parse/sync'
 import * as XLSX from 'xlsx'
 

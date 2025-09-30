@@ -1,4 +1,3 @@
-// list-models.js
 const { GoogleAuth } = require('google-auth-library');
 
 async function listModels() {

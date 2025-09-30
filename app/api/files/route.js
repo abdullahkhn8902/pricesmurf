@@ -1,4 +1,3 @@
-// app/api/files/route.js
 import { MongoClient, ObjectId, GridFSBucket } from "mongodb";
 import { getAuth } from "@clerk/nextjs/server";
 import { parse } from "csv-parse/sync";

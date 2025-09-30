@@ -1,233 +1,284 @@
-"use client";
-import { useState, useEffect, useRef, Suspense } from 'react'
-import { Sidebar, SidebarBody, SidebarLink } from "@/component-app/ui/sidebar";
-import Modal from "@/component-app/ui/Modal";
-import { IconPencil } from "@tabler/icons-react";
-import { IconFolderFilled } from "@tabler/icons-react";
-import { IconMaximize, IconMinimize } from "@tabler/icons-react";
+"use client"
+import { useState, useEffect, useRef, Suspense } from "react"
+import { Sidebar, SidebarBody, SidebarLink } from "@/component-app/ui/sidebar"
+import Modal from "@/component-app/ui/Modal"
+import { IconPencil } from "@tabler/icons-react"
+import { IconFolderFilled } from "@tabler/icons-react"
 
-import {
-  IconBrandTabler,
-  IconFolder,
-  IconBuilding,
-  IconSettings,
-  IconHistory,
-  IconFile,
-  IconPlus,
-  IconCurrencyDollar
-} from "@tabler/icons-react";
-import {
-  SignedIn,
-  UserButton,
-  useUser
-} from '@clerk/nextjs';
-import { FaExchangeAlt } from "react-icons/fa";
-import { FaFileUpload } from "react-icons/fa";
-import { FaChartLine } from "react-icons/fa";
-import { FaBuilding } from "react-icons/fa6";
-import { Hourglass } from "ldrs/react";
-import "ldrs/react/Hourglass.css";
-import { motion } from "motion/react";
-import { cn } from "@/lib/utils";
-import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { IconChevronDown, IconChevronRight } from "@tabler/icons-react";
-import { IconFileOff } from "@tabler/icons-react";
+import { IconBrandTabler, IconFolder, IconFile, IconPlus, IconCurrencyDollar } from "@tabler/icons-react"
+import { SignedIn, UserButton, useUser } from "@clerk/nextjs"
+import { FaExchangeAlt } from "react-icons/fa"
+import { FaFileUpload } from "react-icons/fa"
+import { FaChartLine } from "react-icons/fa"
+import { FaBuilding } from "react-icons/fa6"
+import { FaRobot } from "react-icons/fa"
+import { Hourglass } from "ldrs/react"
+import "ldrs/react/Hourglass.css"
+import { motion } from "motion/react"
+import { cn } from "@/lib/utils"
+import { useRouter, useSearchParams, usePathname } from "next/navigation"
+import { IconChevronDown, IconChevronRight } from "@tabler/icons-react"
+import { IconFileOff } from "@tabler/icons-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { DataQualityModal } from "@/components/data-quality-modal"
+import { MarginLeakageModal } from "@/components/margin-leakage-modal"
+import { Database, FileCheck, TrendingUp, TrendingDown } from "lucide-react"
+
+const agents = [
+  {
+    id: "data-quality",
+    title: "Data Quality Agent",
+    description: "Comprehensive data validation and quality assessment",
+    specialty: "Checks missing values, duplicates, outliers, logical rules",
+    icon: Database,
+    color: "bg-blue-500",
+    available: true,
+  },
+  {
+    id: "margin-leakage",
+    title: "Margin Leakage Agent",
+    description: "Identify products/customers sold below target margin",
+    specialty: "Detects below-cost sales, low margins, extreme discounts",
+    icon: TrendingDown,
+    color: "bg-red-500",
+    available: true,
+  },
+  {
+    id: "performance",
+    title: "Opportunity Agent",
+    description: "Suggest where we can increase price or upsell.",
+    specialty: "Query optimization, index recommendations",
+    icon: TrendingUp,
+    color: "bg-orange-500",
+    available: false,
+  },
+  {
+    id: "schema",
+    title: "Win Loss Agent",
+    description: "Analyze deals marked as won or lost and find patterns.",
+    specialty: "Schema validation, normalization suggestions",
+    icon: FileCheck,
+    color: "bg-purple-500",
+    available: false,
+  },
+]
 
 // Create inner component for Sidebar that uses useSearchParams
 function SidebarContent() {
-  const [newSubcategoryModal, setNewSubcategoryModal] = useState({ open: false, category: '' });
-  const [newSubcategoryName, setNewSubcategoryName] = useState('');
-  const [expandedSubcategories, setExpandedSubcategories] = useState({});
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const pathname = usePathname();
+  const [newSubcategoryModal, setNewSubcategoryModal] = useState({ open: false, category: "" })
+  const [newSubcategoryName, setNewSubcategoryName] = useState("")
+  const [expandedSubcategories, setExpandedSubcategories] = useState({})
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
   const [isClient, setIsClient] = useState(false)
-  const [open, setOpen] = useState(false);
-  const { user, isLoaded } = useUser();
-  const [sidebarData, setSidebarData] = useState([]);
+  const [open, setOpen] = useState(false)
+  const { user, isLoaded } = useUser()
+  const [sidebarData, setSidebarData] = useState([])
   const [expandedCategories, setExpandedCategories] = useState({
-    'Company Tables': false,
-    'Parameters': false,
-    'Transactions': false,
-    'Other Tables': false,
-    'Price Lists': false
-  });
-  const [loading, setLoading] = useState(true);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [lastFetchTime, setLastFetchTime] = useState(0);
-  const initialLoadRef = useRef(true);
+    "Company Tables": false,
+    Parameters: false,
+    Transactions: false,
+    "Other Tables": false,
+    "Price Lists": false,
+  })
+  const [loading, setLoading] = useState(true)
+  const [selectedFile, setSelectedFile] = useState(null)
+  const [lastFetchTime, setLastFetchTime] = useState(0)
+  const initialLoadRef = useRef(true)
+  const [showAgents, setShowAgents] = useState(false)
 
   useEffect(() => {
-    setIsClient(true);
+    setIsClient(true)
 
     if (initialLoadRef.current || open) {
-      fetchSidebarData();
-      initialLoadRef.current = false;
+      fetchSidebarData()
+      initialLoadRef.current = false
     }
 
     if (!open) {
       setExpandedCategories({
-        'Company Tables': false,
-        'Parameters': false,
-        'Transactions': false,
-        'Other Tables': false,
-        'Price Lists': false
-      });
+        "Company Tables": false,
+        Parameters: false,
+        Transactions: false,
+        "Other Tables": false,
+        "Price Lists": false,
+      })
     }
+  }, [open])
 
-  }, [open]);
   useEffect(() => {
-    const fileId = searchParams.get('file');
-    if (fileId) {
-      setSelectedFile(fileId);
+    const fileId = searchParams.get("file")
+    const agentsView = searchParams.get("view") === "agents"
+
+    if (agentsView) {
+      setShowAgents(true)
+      setSelectedFile(null)
+    } else if (fileId) {
+      setSelectedFile(fileId)
+      setShowAgents(false)
     }
-  }, [searchParams]);
+  }, [searchParams])
+
   const toggleSubcategory = (category, subcategory) => {
-    setExpandedSubcategories(prev => ({
+    setExpandedSubcategories((prev) => ({
       ...prev,
-      [`${category}-${subcategory}`]: !prev[`${category}-${subcategory}`]
-    }));
-  };
+      [`${category}-${subcategory}`]: !prev[`${category}-${subcategory}`],
+    }))
+  }
 
   const fetchSidebarData = async () => {
     try {
       // Fetch files
-      const res = await fetch('/api/files?metadata=1');
-      if (!res.ok) throw new Error('Failed to fetch files');
-      const files = await res.json();
+      const res = await fetch("/api/files?metadata=1")
+      if (!res.ok) throw new Error("Failed to fetch files")
+      const files = await res.json()
 
       // Fetch custom subcategories
-      let customSubs = [];
+      let customSubs = []
       try {
-        const customRes = await fetch('/api/subcategories');
+        const customRes = await fetch("/api/subcategories")
         if (customRes.ok) {
-          customSubs = await customRes.json();
-          console.log('Fetched custom subcategories:', customSubs);
+          customSubs = await customRes.json() // Corrected: use customRes
+          console.log("Fetched custom subcategories:", customSubs)
         } else {
-          console.error('Failed to fetch subcategories:', customRes.status);
+          console.error("Failed to fetch subcategories:", customRes.status)
         }
       } catch (err) {
-        console.error('Error fetching subcategories:', err);
+        console.error("Error fetching subcategories:", err)
       }
 
       // Initialize organizedData with predefined structure
       const organizedData = {
-        'Company Tables': {
+        "Company Tables": {
           icon: <FaBuilding className="h-5 w-5 shrink-0 text-white " />,
           subcategories: {
-            'Products': { files: [] },
-            'Customers': { files: [] },
-          }
+            Products: { files: [] },
+            Customers: { files: [] },
+          },
         },
-        'Parameters': {
+        Parameters: {
           icon: <FaChartLine className="h-5 w-5 shrink-0 text-white " />,
           subcategories: {
-            'Pricing Parameters': { files: [] },
-            'Tax Rates': { files: [] },
-            'Other Parameters': { files: [] }
-          }
+            "Pricing Parameters": { files: [] },
+            "Tax Rates": { files: [] },
+            "Other Parameters": { files: [] },
+          },
         },
-        'Transactions': {
+        Transactions: {
           icon: <FaExchangeAlt className="h-5 w-5 shrink-0 text-white " />,
           subcategories: {
-            'Historical Transactions': { files: [] },
-            'Other Transactions': { files: [] }
-          }
+            "Historical Transactions": { files: [] },
+            "Other Transactions": { files: [] },
+          },
         },
-        'Other Tables': {
+        "Other Tables": {
           icon: <IconFolder className="h-5 w-5 shrink-0 text-white " />,
           subcategories: {
-            'Uncategorized': { files: [] }
-          }
+            Uncategorized: { files: [] },
+          },
         },
-        'Price Lists': {
+        "Price Lists": {
           icon: <IconCurrencyDollar className="h-5 w-5 shrink-0 text-white " />,
-          files: []
-        }
-      };
+          files: [],
+        },
+      }
 
       // Add custom subcategories to organizedData
-      customSubs.forEach(sub => {
-        const category = sub.category;
-        const subcategory = sub.subcategory;
+      customSubs.forEach((sub) => {
+        const category = sub.category
+        const subcategory = sub.subcategory
 
         if (organizedData[category]) {
           // Initialize subcategories if needed
           if (!organizedData[category].subcategories) {
-            organizedData[category].subcategories = {};
+            organizedData[category].subcategories = {}
           }
 
           // Add custom subcategory if it doesn't exist
           if (!organizedData[category].subcategories[subcategory]) {
-            organizedData[category].subcategories[subcategory] = { files: [] };
+            organizedData[category].subcategories[subcategory] = { files: [] }
           }
         }
-      });
+      })
 
-      console.log('After adding custom subs:', JSON.stringify(organizedData, null, 2));
+      console.log("After adding custom subs:", JSON.stringify(organizedData, null, 2))
 
       // Process files
-      files.forEach(file => {
-        const category = file.category || 'Other Tables';
-        const subcategory = file.subcategory || 'Uncategorized';
+      files.forEach((file) => {
+        const category = file.category || "Other Tables"
+        const subcategory = file.subcategory || "Uncategorized"
 
         // Create consistent file data object
         const fileData = {
           id: file.id,
           filename: file.filename,
-          readOnly: file.readOnly || false
-        };
+          readOnly: file.readOnly || false,
+        }
 
-        if (file.category === 'Price Lists') {
-          organizedData['Price Lists'].files.push(fileData);
+        if (file.category === "Price Lists") {
+          organizedData["Price Lists"].files.push(fileData)
         } else {
           // Ensure category exists
           if (!organizedData[category]) {
             organizedData[category] = {
               icon: <IconFolder className="h-5 w-5 shrink-0 text-white" />,
-              subcategories: {}
-            };
+              subcategories: {},
+            }
           }
 
           // Ensure subcategory exists
           if (!organizedData[category].subcategories[subcategory]) {
-            organizedData[category].subcategories[subcategory] = { files: [] };
+            organizedData[category].subcategories[subcategory] = { files: [] }
           }
 
           // Add file to subcategory
-          organizedData[category].subcategories[subcategory].files.push(fileData);
+          organizedData[category].subcategories[subcategory].files.push(fileData)
         }
-      });
-      console.log('Final organized data:', JSON.stringify(organizedData, null, 2));
-      setSidebarData(organizedData);
+      })
+      console.log("Final organized data:", JSON.stringify(organizedData, null, 2))
+      setSidebarData(organizedData)
     } catch (err) {
-      console.error('Error fetching sidebar data:', err);
+      console.error("Error fetching sidebar data:", err)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
-
+  }
 
   const toggleCategory = (category) => {
-    setExpandedCategories(prev => ({
+    setExpandedCategories((prev) => ({
       ...prev,
-      [category]: !prev[category]
-    }));
-  };
+      [category]: !prev[category],
+    }))
+  }
 
   const handleFileSelect = (fileId, category, subcategory) => {
-    setSelectedFile(fileId);
-    const params = new URLSearchParams(searchParams);
-    params.set('file', fileId);
-    params.set('category', category);
-    params.set('subcategory', subcategory);
-    router.replace(`${pathname}?${params.toString()}`);
-  };
+    setSelectedFile(fileId)
+    setShowAgents(false)
+    const params = new URLSearchParams(searchParams)
+    params.set("file", fileId)
+    params.set("category", category)
+    params.set("subcategory", subcategory)
+    params.delete("view")
+    router.replace(`${pathname}?${params.toString()}`)
+  }
 
+  const handleShowAgents = () => {
+    setShowAgents(true)
+    setSelectedFile(null)
+    const params = new URLSearchParams(searchParams)
+    params.set("view", "agents")
+    params.delete("file")
+    params.delete("category")
+    params.delete("subcategory")
+    router.replace(`${pathname}?${params.toString()}`)
+  }
 
   const handleCreatePriceList = () => {
-    router.push('/app-pages/createOrUpload?purpose=price-list');
-  };
+    router.push("/app-pages/createOrUpload?purpose=price-list")
+  }
 
   const links = [
     {
@@ -239,29 +290,30 @@ function SidebarContent() {
       label: "Create or Upload File",
       href: "/app-pages/createOrUpload",
       icon: <FaFileUpload className="h-5 w-5 shrink-0 text-white" />,
-    }
-  ];
+    },
+  ]
+
   const createSubcategory = async () => {
     try {
-      const res = await fetch('/api/subcategories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/subcategories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           category: newSubcategoryModal.category,
-          subcategory: newSubcategoryName
-        })
-      });
+          subcategory: newSubcategoryName,
+        }),
+      })
 
       if (res.ok) {
         // Refresh sidebar data
-        fetchSidebarData();
-        setNewSubcategoryModal({ open: false, category: '' });
-        setNewSubcategoryName('');
+        fetchSidebarData()
+        setNewSubcategoryModal({ open: false, category: "" })
+        setNewSubcategoryName("")
       }
     } catch (err) {
-      console.error('Error creating subcategory:', err);
+      console.error("Error creating subcategory:", err)
     }
-  };
+  }
 
   return (
     <div
@@ -277,6 +329,25 @@ function SidebarContent() {
               {links.map((link, idx) => (
                 <SidebarLink key={idx} link={link} />
               ))}
+
+              <button
+                onClick={handleShowAgents}
+                className={cn(
+                  "flex items-center gap-2 py-2  rounded hover:bg-blue-700 transition-colors",
+                  showAgents && "bg-bljue-500",
+                )}
+              >
+                <FaRobot className="h-6 w-6 shrink-0 text-white" />
+                <motion.span
+                  animate={{
+                    display: open ? "inline-block" : "none",
+                    opacity: open ? 1 : 0,
+                  }}
+                  className="text-white text-sm"
+                >
+                  AI Agents
+                </motion.span>
+              </button>
 
               {loading ? (
                 <div className="flex justify-center py-4">
@@ -316,7 +387,7 @@ function SidebarContent() {
 
                     {expandedCategories[category] && (
                       <div className="pl-6">
-                        {category === 'Price Lists' && (
+                        {category === "Price Lists" && (
                           <button
                             onClick={handleCreatePriceList}
                             className="flex items-center gap-1 text-xs text-white mb-2"
@@ -324,14 +395,14 @@ function SidebarContent() {
                             <IconPlus size={12} /> Create Price List
                           </button>
                         )}
-                        {category === 'Price Lists' ? (
-                          categoryData.files.map(file => (
+                        {category === "Price Lists" ? (
+                          categoryData.files.map((file) => (
                             <button
                               key={file.id}
-                              onClick={() => handleFileSelect(file.id, category, '')}
+                              onClick={() => handleFileSelect(file.id, category, "")}
                               className={cn(
                                 "block py-1 text-white text-xs truncate hover:underline w-full text-left",
-                                selectedFile === file.id && "bg-blue-500 rounded px-2"
+                                selectedFile === file.id && "bg-blue-500 rounded px-2",
                               )}
                               title={file.filename}
                             >
@@ -390,13 +461,13 @@ function SidebarContent() {
                                 {expandedSubcategories[`${category}-${subcategory}`] && (
                                   <div className="pl-6 border-l-2 border-blue-400 ml-2 my-1">
                                     {subData.files.length > 0 ? (
-                                      subData.files.map(file => (
+                                      subData.files.map((file) => (
                                         <button
                                           key={file.id}
                                           onClick={() => handleFileSelect(file.id, category, subcategory)}
                                           className={cn(
                                             "flex items-center py-1 text-white text-xs w-full text-left hover:underline",
-                                            selectedFile === file.id && "bg-blue-500 rounded px-2"
+                                            selectedFile === file.id && "bg-blue-500 rounded px-2",
                                           )}
                                           title={file.filename}
                                         >
@@ -428,11 +499,8 @@ function SidebarContent() {
                                     )}
                                   </div>
                                 )}
-
                               </div>
                             ))}
-
-
                           </>
                         )}
                       </div>
@@ -446,8 +514,8 @@ function SidebarContent() {
                     appearance={{
                       elements: {
                         userButtonBox: "flex items-center gap-2",
-                        userButtonTrigger: "hover:bg-gray-100 rounded-full"
-                      }
+                        userButtonTrigger: "hover:bg-gray-100 rounded-full",
+                      },
                     }}
                   />
                   {isLoaded ? <span>{user?.fullName || "User"}</span> : null}
@@ -457,20 +525,16 @@ function SidebarContent() {
           </div>
         </SidebarBody>
       </Sidebar>
-      <Dashboard selectedFileId={selectedFile} />
+      {showAgents ? <AgentsView /> : <Dashboard selectedFileId={selectedFile} />}
       <Modal
         isOpen={newSubcategoryModal.open}
-        onClose={() => setNewSubcategoryModal({ open: false, category: '' })}
+        onClose={() => setNewSubcategoryModal({ open: false, category: "" })}
         title={
-          <span className="text-indigo-900 font-semibold">
-            Create Subcategory in {newSubcategoryModal.category}
-          </span>
+          <span className="text-indigo-900 font-semibold">Create Subcategory in {newSubcategoryModal.category}</span>
         }
       >
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Subcategory Name
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Subcategory Name</label>
           <input
             type="text"
             value={newSubcategoryName}
@@ -481,527 +545,586 @@ function SidebarContent() {
         </div>
         <div className="flex justify-end gap-2">
           <button
-            onClick={() => setNewSubcategoryModal({ open: false, category: '' })}
+            onClick={() => setNewSubcategoryModal({ open: false, category: "" })}
             className="px-4 py-2 bg-gray-500 rounded-md"
           >
             Cancel
           </button>
-          <button
-            onClick={createSubcategory}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md"
-          >
+          <button onClick={createSubcategory} className="px-4 py-2 bg-blue-600 text-white rounded-md">
             Create
           </button>
         </div>
       </Modal>
-
     </div>
-  );
+  )
+}
+
+function AgentsView() {
+  const [selectedAgent, setSelectedAgent] = useState(null)
+
+  return (
+    <div className="flex-1 bg-gray-200 overflow-y-auto">
+      {/* Header */}
+      <div className="border-b bg-white">
+        <div className="container mx-auto px-4 py-6">
+          <h1 className="text-3xl font-bold text-indigo-900">AI Data Agents</h1>
+          <p className="text-gray-600 mt-2">Intelligent agents for data validation, analysis, and optimization</p>
+        </div>
+      </div>
+
+      {/* Agents Grid */}
+      <div className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {agents.map((agent) => {
+            const IconComponent = agent.icon
+            return (
+              <Card key={agent.id} className="relative overflow-hidden hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${agent.color} text-white`}>
+                      <IconComponent className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1">
+                      <CardTitle className="text-lg">{agent.title}</CardTitle>
+                      {!agent.available && (
+                        <Badge variant="secondary" className="mt-1">
+                          Coming Soon
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <CardDescription className="text-sm">{agent.description}</CardDescription>
+
+                  <div className="bg-muted/50 p-3 rounded-lg">
+                    <p className="text-xs text-muted-foreground font-medium mb-1">SPECIALTY</p>
+                    <p className="text-sm">{agent.specialty}</p>
+                  </div>
+
+                  <Button className="w-full" disabled={!agent.available} onClick={() => setSelectedAgent(agent.id)}>
+                    {agent.available ? `Try ${agent.title}` : "Coming Soon"}
+                  </Button>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Data Quality Modal */}
+      {selectedAgent === "data-quality" && <DataQualityModal isOpen={true} onClose={() => setSelectedAgent(null)} />}
+
+      {selectedAgent === "margin-leakage" && (
+        <MarginLeakageModal isOpen={true} onClose={() => setSelectedAgent(null)} />
+      )}
+    </div>
+  )
 }
 
 // Create inner component for Dashboard that uses useSearchParams
 
 function DashboardContent({ selectedFileId: propSelectedFileId }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const [isEditingFileName, setIsEditingFileName] = useState(false);
-  const [newFileName, setNewFileName] = useState('');
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [isClient, setIsClient] = useState(false);
-  const [files, setFiles] = useState([]);
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const [isEditingFileName, setIsEditingFileName] = useState(false)
+  const [newFileName, setNewFileName] = useState("")
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [isClient, setIsClient] = useState(false)
+  const [files, setFiles] = useState([])
 
-  const [selectedFileId, setSelectedFileId] = useState('');
-  const [sheetName, setSheetName] = useState('Sheet# 1');
-  const [columns, setColumns] = useState([]);
-  const [data, setData] = useState([]);
-  const [editingIndex, setEditingIndex] = useState(null);
-  const [editData, setEditData] = useState({});
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [analysis, setAnalysis] = useState('');
-  const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
-  const [analysisError, setAnalysisError] = useState('');
-  const [customPrompt, setCustomPrompt] = useState('');
-  const [showCustomPromptModal, setShowCustomPromptModal] = useState(false);
-  const [showTransformModal, setShowTransformModal] = useState(false);
-  const [transformPrompt, setTransformPrompt] = useState('');
-  const [showAddColumnModal, setShowAddColumnModal] = useState(false);
-  const [newColumnName, setNewColumnName] = useState('');
-  const [columnToRemove, setColumnToRemove] = useState(null);
-  const [isReadOnly, setIsReadOnly] = useState(false);
-  const [showAddRowModal, setShowAddRowModal] = useState(false);
-  const [newRowData, setNewRowData] = useState({});
-  const [columnDefaultValue, setColumnDefaultValue] = useState('');
-  const [newColumnRowValues, setNewColumnRowValues] = useState({});
+  const [selectedFileId, setSelectedFileId] = useState("")
+  const [sheetName, setSheetName] = useState("Sheet# 1")
+  const [columns, setColumns] = useState([])
+  const [data, setData] = useState([])
+  const [editingIndex, setEditingIndex] = useState(null)
+  const [editData, setEditData] = useState({})
+  const [error, setError] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [analysis, setAnalysis] = useState("")
+  const [isAnalysisLoading, setIsAnalysisLoading] = useState(false)
+  const [analysisError, setAnalysisError] = useState("")
+  const [customPrompt, setCustomPrompt] = useState("")
+  const [showCustomPromptModal, setShowCustomPromptModal] = useState(false)
+  const [showTransformModal, setShowTransformModal] = useState(false)
+  const [transformPrompt, setTransformPrompt] = useState("")
+  const [showAddColumnModal, setShowAddColumnModal] = useState(false)
+  const [newColumnName, setNewColumnName] = useState("")
+  const [columnToRemove, setColumnToRemove] = useState(null)
+  const [isReadOnly, setIsReadOnly] = useState(false)
+  const [showAddRowModal, setShowAddRowModal] = useState(false)
+  const [newRowData, setNewRowData] = useState({})
+  const [columnDefaultValue, setColumnDefaultValue] = useState("")
+  const [newColumnRowValues, setNewColumnRowValues] = useState({})
 
   // Category UI states
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [categoryOptions] = useState([
-    "Company Tables",
-    "Parameters",
-    "Transactions",
-    "Other Tables",
-    "Price Lists"
-  ]);
+  const [showCategoryModal, setShowCategoryModal] = useState(false)
+  const [categoryOptions] = useState(["Company Tables", "Parameters", "Transactions", "Other Tables", "Price Lists"])
   const BASE_SUBCATS = {
     "Company Tables": ["Products", "Customers"],
-    "Parameters": ["Pricing Parameters", "Tax Rates"],
-    "Transactions": ["Historical Transactions"],
+    Parameters: ["Pricing Parameters", "Tax Rates"],
+    Transactions: ["Historical Transactions"],
     "Other Tables": ["Uncategorized"],
-    "Price Lists": ["General"]
-  };
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedSubcategory, setSelectedSubcategory] = useState('');
-  const [availableSubcategories, setAvailableSubcategories] = useState([]);
-  const [categoryLoading, setCategoryLoading] = useState(false);
-  const [categoryError, setCategoryError] = useState('');
+    "Price Lists": ["General"],
+  }
+  const [selectedCategory, setSelectedCategory] = useState("")
+  const [selectedSubcategory, setSelectedSubcategory] = useState("")
+  const [availableSubcategories, setAvailableSubcategories] = useState([])
+  const [categoryLoading, setCategoryLoading] = useState(false)
+  const [categoryError, setCategoryError] = useState("")
 
   // Get the current selected file
-  const selectedFile = files.find(file => file.id === selectedFileId);
-  const fileName = selectedFile ? selectedFile.filename : sheetName;
+  const selectedFile = files.find((file) => file.id === selectedFileId)
+  const fileName = selectedFile ? selectedFile.filename : sheetName
 
   const sanitizeColumnName = (name) => {
-    return (name || '').toString().replace(/[^a-zA-Z0-9\s_-]/g, '').trim() || 'Unnamed';
-  };
+    return (
+      (name || "")
+        .toString()
+        .replace(/[^a-zA-Z0-9\s_-]/g, "")
+        .trim() || "Unnamed"
+    )
+  }
 
   useEffect(() => {
-    setIsClient(true);
-    fetch('/api/files')
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch files');
-        return res.json();
+    setIsClient(true)
+    fetch("/api/files")
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch files")
+        return res.json()
       })
-      .then(files => {
-        setFiles(files);
-        if (propSelectedFileId && files.some(f => f.id === propSelectedFileId)) {
-          setSelectedFileId(propSelectedFileId);
-          const selectedFile = files.find(f => f.id === propSelectedFileId);
-          setIsReadOnly(selectedFile?.readOnly || false);
+      .then((files) => {
+        setFiles(files)
+        if (propSelectedFileId && files.some((f) => f.id === propSelectedFileId)) {
+          setSelectedFileId(propSelectedFileId)
+          const selectedFile = files.find((f) => f.id === propSelectedFileId)
+          setIsReadOnly(selectedFile?.readOnly || false)
         } else if (files.length > 0) {
-          setSelectedFileId(files[0].id);
-          setIsReadOnly(files[0]?.readOnly || false);
+          setSelectedFileId(files[0].id)
+          setIsReadOnly(files[0]?.readOnly || false)
         }
-        setError('');
+        setError("")
       })
-      .catch(err => {
-        setError('Error fetching files. Please try again.');
-        console.error('Error fetching files:', err);
+      .catch((err) => {
+        setError("Error fetching files. Please try again.")
+        console.error("Error fetching files:", err)
       })
-      .finally(() => setIsLoading(false));
-  }, [propSelectedFileId]);
+      .finally(() => setIsLoading(false))
+  }, [propSelectedFileId])
 
   useEffect(() => {
-    let isMounted = true;
+    let isMounted = true
     const fetchFileData = async () => {
-      if (!selectedFileId) return;
+      if (!selectedFileId) return
 
-      setIsLoading(true);
+      setIsLoading(true)
       try {
-        const res = await fetch(`/api/files?id=${selectedFileId}`);
-        if (!res.ok) throw new Error('Failed to fetch file data');
-        const { sheetName, columns, data, analysis, isReadOnly: roFlag } = await res.json();
+        const res = await fetch(`/api/files?id=${selectedFileId}`)
+        if (!res.ok) throw new Error("Failed to fetch file data")
+        const { sheetName, columns, data, analysis, isReadOnly: roFlag } = await res.json()
 
         if (isMounted) {
-          setSheetName(sheetName || 'Sheets');
-          setColumns((columns || []).map(sanitizeColumnName));
-          setData(data || []);
-          setAnalysis(analysis || '');
-          setIsReadOnly(roFlag);
+          setSheetName(sheetName || "Sheets")
+          setColumns((columns || []).map(sanitizeColumnName))
+          setData(data || [])
+          setAnalysis(analysis || "")
+          setIsReadOnly(roFlag)
         }
 
-        setError('');
+        setError("")
       } catch (err) {
-        setError('Error fetching file data. Please try again.');
-        console.error('Error:', err);
+        setError("Error fetching file data. Please try again.")
+        console.error("Error:", err)
       } finally {
-        if (isMounted) setIsLoading(false);
+        if (isMounted) setIsLoading(false)
       }
-    };
+    }
 
-    fetchFileData();
-    return () => { isMounted = false };
-  }, [selectedFileId]);
-
+    fetchFileData()
+    return () => {
+      isMounted = false
+    }
+  }, [selectedFileId])
 
   useEffect(() => {
     if (selectedFileId && files.length > 0) {
-      const selectedFile = files.find(file => file.id === selectedFileId);
-      setIsReadOnly(selectedFile?.readOnly || false);
+      const selectedFile = files.find((file) => file.id === selectedFileId)
+      setIsReadOnly(selectedFile?.readOnly || false)
     }
-  }, [selectedFileId, files]);
+  }, [selectedFileId, files])
 
   // When category changes, load subcategories (try /api/subcategories then fallback)
   useEffect(() => {
     if (!selectedCategory) {
-      setAvailableSubcategories([]);
-      setSelectedSubcategory('');
-      return;
+      setAvailableSubcategories([])
+      setSelectedSubcategory("")
+      return
     }
 
-    let cancelled = false;
+    let cancelled = false
     async function loadSubs() {
-      setCategoryLoading(true);
-      setCategoryError('');
+      setCategoryLoading(true)
+      setCategoryError("")
       try {
-        const res = await fetch('/api/subcategories');
+        const res = await fetch("/api/subcategories")
         if (res.ok) {
-          const subs = await res.json(); // expected array of {category, subcategory}
-          const filtered = subs.filter(s => s.category === selectedCategory).map(s => s.subcategory);
+          const subs = await res.json() // expected array of {category, subcategory}
+          const filtered = subs.filter((s) => s.category === selectedCategory).map((s) => s.subcategory)
           if (!cancelled && filtered.length > 0) {
-            setAvailableSubcategories(filtered);
-            setSelectedSubcategory(filtered[0] || '');
-            return;
+            setAvailableSubcategories(filtered)
+            setSelectedSubcategory(filtered[0] || "")
+            return
           }
         }
       } catch (e) {
-        console.error('Failed to fetch custom subcategories', e);
+        console.error("Failed to fetch custom subcategories", e)
       }
 
       // fallback
-      const fallback = BASE_SUBCATS[selectedCategory] || [];
+      const fallback = BASE_SUBCATS[selectedCategory] || []
       if (!cancelled) {
-        setAvailableSubcategories(fallback);
-        setSelectedSubcategory(fallback[0] || '');
+        setAvailableSubcategories(fallback)
+        setSelectedSubcategory(fallback[0] || "")
       }
-      setCategoryLoading(false);
+      setCategoryLoading(false)
     }
-    loadSubs();
-    return () => { cancelled = true; };
-  }, [selectedCategory]);
+    loadSubs()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedCategory])
 
   const handleEdit = (index) => {
-    setEditingIndex(index);
-    setEditData(data[index]);
-  };
+    setEditingIndex(index)
+    setEditData(data[index])
+  }
 
-  const handleAnalyze = async (customPrompt = '') => {
+  const handleAnalyze = async (customPrompt = "") => {
     if (!selectedFileId) {
-      setAnalysisError('No file selected');
-      return;
+      setAnalysisError("No file selected")
+      return
     }
 
-    setIsAnalysisLoading(true);
-    setAnalysisError('');
+    setIsAnalysisLoading(true)
+    setAnalysisError("")
     try {
       const response = await fetch(`/api/analyze?fileId=${selectedFileId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ customPrompt }),
-      });
+      })
 
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Analysis failed');
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "Analysis failed")
 
-      setAnalysis(result.analysis);
+      setAnalysis(result.analysis)
     } catch (err) {
-      setAnalysisError(err.message);
+      setAnalysisError(err.message)
     } finally {
-      setIsAnalysisLoading(false);
-      setShowCustomPromptModal(false);
+      setIsAnalysisLoading(false)
+      setShowCustomPromptModal(false)
     }
-  };
+  }
 
-  const handleCustomAnalyze = () => setShowCustomPromptModal(true);
-  const handlePromptSubmit = () => handleAnalyze(customPrompt);
+  const handleCustomAnalyze = () => setShowCustomPromptModal(true)
+  const handlePromptSubmit = () => handleAnalyze(customPrompt)
 
   const handleSave = () => {
     if (editingIndex === null || editingIndex >= data.length) {
-      setError('Cannot save: Invalid row index');
-      return;
+      setError("Cannot save: Invalid row index")
+      return
     }
 
-    const updatedData = [...data];
-    updatedData[editingIndex] = editData;
-    setData(updatedData);
+    const updatedData = [...data]
+    updatedData[editingIndex] = editData
+    setData(updatedData)
 
-    setEditingIndex(null);
-    setEditData({});
-    setError('');
-  };
+    setEditingIndex(null)
+    setEditData({})
+    setError("")
+  }
 
   const handleSaveChanges = async () => {
     if (!selectedFileId) {
-      setError('No file selected');
-      return;
+      setError("No file selected")
+      return
     }
 
-    setIsLoading(true);
+    setIsLoading(true)
     try {
       const response = await fetch(`/api/update?id=${selectedFileId}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ sheetName, columns, data }),
-      });
+      })
 
       if (!response.ok) {
-        throw new Error('Failed to save changes');
+        throw new Error("Failed to save changes")
       }
 
-      setError('');
-      alert('Changes saved successfully');
+      setError("")
+      alert("Changes saved successfully")
     } catch (err) {
-      setError('Error saving changes. Please try again.');
-      console.error('Error saving changes:', err);
+      setError("Error saving changes. Please try again.")
+      console.error("Error saving changes:", err)
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   const handleRemove = (index) => {
-    const updatedData = data.filter((_, i) => i !== index);
-    setData(updatedData);
-  };
+    const updatedData = data.filter((_, i) => i !== index)
+    setData(updatedData)
+  }
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setEditData((prevData) => ({ ...prevData, [name]: value }));
-  };
+    const { name, value } = e.target
+    setEditData((prevData) => ({ ...prevData, [name]: value }))
+  }
 
   const handleTransformData = async () => {
     if (!selectedFileId) {
-      setAnalysisError('No file selected');
-      return;
+      setAnalysisError("No file selected")
+      return
     }
 
-    setIsAnalysisLoading(true);
-    setAnalysisError('');
+    setIsAnalysisLoading(true)
+    setAnalysisError("")
 
     try {
       const response = await fetch(`/api/transform?fileId=${selectedFileId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: transformPrompt }),
-      });
+      })
 
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Transformation failed');
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "Transformation failed")
 
-      setColumns(result.columns);
-      setData(result.data);
+      setColumns(result.columns)
+      setData(result.data)
 
-      setAnalysis('Data transformation completed successfully!');
-      setShowTransformModal(false);
+      setAnalysis("Data transformation completed successfully!")
+      setShowTransformModal(false)
     } catch (err) {
-      setAnalysisError(err.message);
+      setAnalysisError(err.message)
     } finally {
-      setIsAnalysisLoading(false);
+      setIsAnalysisLoading(false)
     }
-  };
+  }
 
   const handleAddColumn = () => {
     if (!newColumnName.trim()) {
-      setError('Column name cannot be empty');
-      return;
+      setError("Column name cannot be empty")
+      return
     }
 
-    const sanitized = sanitizeColumnName(newColumnName);
+    const sanitized = sanitizeColumnName(newColumnName)
     if (columns.includes(sanitized)) {
-      setError(`Column "${sanitized}" already exists`);
-      return;
+      setError(`Column "${sanitized}" already exists`)
+      return
     }
 
     // Create new column with values for each row
     const newData = data.map((row, index) => ({
       ...row,
-      [sanitized]: newColumnRowValues[index] || ''
-    }));
+      [sanitized]: newColumnRowValues[index] || "",
+    }))
 
-    setColumns([...columns, sanitized]);
-    setData(newData);
-    setShowAddColumnModal(false);
-    setNewColumnName('');
-    setNewColumnRowValues({}); // Reset row values
-    setError('');
-  };
+    setColumns([...columns, sanitized])
+    setData(newData)
+    setShowAddColumnModal(false)
+    setNewColumnName("")
+    setNewColumnRowValues({}) // Reset row values
+    setError("")
+  }
 
   const handleRemoveColumn = (columnName) => {
     if (columns.length <= 1) {
-      setError('Cannot remove the last column');
-      return;
+      setError("Cannot remove the last column")
+      return
     }
 
-    const newData = data.map(row => {
-      const newRow = { ...row };
-      delete newRow[columnName];
-      return newRow;
-    });
+    const newData = data.map((row) => {
+      const newRow = { ...row }
+      delete newRow[columnName]
+      return newRow
+    })
 
-    setColumns(columns.filter(col => col !== columnName));
-    setData(newData);
-    setColumnToRemove(null);
-  };
+    setColumns(columns.filter((col) => col !== columnName))
+    setData(newData)
+    setColumnToRemove(null)
+  }
 
   const handleSaveFileName = async () => {
-    if (!selectedFileId) return;
+    if (!selectedFileId) return
 
-    setIsLoading(true);
+    setIsLoading(true)
     try {
-      const response = await fetch('/api/update-filename', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/update-filename", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: selectedFileId,
-          newFilename: newFileName
-        })
-      });
+          newFilename: newFileName,
+        }),
+      })
 
-      const result = await response.json();
+      const result = await response.json()
 
       if (response.ok) {
         // Update the files state with the new filename
-        setFiles(prevFiles =>
-          prevFiles.map(file =>
-            file.id === selectedFileId
-              ? { ...file, filename: result.newFilename }
-              : file
-          )
-        );
-        setIsEditingFileName(false);
+        setFiles((prevFiles) =>
+          prevFiles.map((file) => (file.id === selectedFileId ? { ...file, filename: result.newFilename } : file)),
+        )
+        setIsEditingFileName(false)
       } else {
-        throw new Error(result.error || 'Failed to update filename');
+        throw new Error(result.error || "Failed to update filename")
       }
     } catch (err) {
-      setError(err.message);
+      setError(err.message)
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   const handleToggleReadOnly = async () => {
-    if (!selectedFileId) return;
+    if (!selectedFileId) return
 
-    setIsLoading(true);
+    setIsLoading(true)
     try {
-      const response = await fetch('/api/update-readonly', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/update-readonly", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: selectedFileId,
-          readOnly: !isReadOnly
-        })
-      });
+          readOnly: !isReadOnly,
+        }),
+      })
 
-      const result = await response.json();
+      const result = await response.json()
 
       if (response.ok) {
         // Update local state
-        setIsReadOnly(!isReadOnly);
+        setIsReadOnly(!isReadOnly)
 
         // Update files list
-        setFiles(prevFiles =>
-          prevFiles.map(file =>
-            file.id === selectedFileId
-              ? { ...file, readOnly: !isReadOnly }
-              : file
-          )
-        );
+        setFiles((prevFiles) =>
+          prevFiles.map((file) => (file.id === selectedFileId ? { ...file, readOnly: !isReadOnly } : file)),
+        )
       } else {
-        throw new Error(result.error || 'Failed to update read-only status');
+        throw new Error(result.error || "Failed to update read-only status")
       }
     } catch (err) {
-      setError(err.message);
+      setError(err.message)
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
   const handleAddRow = () => {
     // Check if any value is provided
-    const hasValue = Object.values(newRowData).some(val => val !== '');
+    const hasValue = Object.values(newRowData).some((val) => val !== "")
 
     if (!hasValue) {
-      setError('Please enter at least one value for the new row');
-      return;
+      setError("Please enter at least one value for the new row")
+      return
     }
 
     // Create new row with user-provided values
-    const newRow = {};
-    columns.forEach(col => {
-      newRow[col] = newRowData[col] || '';
-    });
+    const newRow = {}
+    columns.forEach((col) => {
+      newRow[col] = newRowData[col] || ""
+    })
 
-    setData([...data, newRow]);
-    setShowAddRowModal(false);
-    setNewRowData({});
-    setError('');
-  };
+    setData([...data, newRow])
+    setShowAddRowModal(false)
+    setNewRowData({})
+    setError("")
+  }
 
   const handleRowInputChange = (col, value) => {
-    setNewRowData(prev => ({
+    setNewRowData((prev) => ({
       ...prev,
-      [col]: value
-    }));
-  };
+      [col]: value,
+    }))
+  }
 
   // Open category modal and prefill with current file category
   const openCategoryModal = () => {
-    setCategoryError('');
-    const currentFile = files.find(f => f.id === selectedFileId);
-    const curCat = currentFile?.category || '';
-    const curSub = currentFile?.subcategory || '';
-    setSelectedCategory(curCat);
-    setSelectedSubcategory(curSub);
+    setCategoryError("")
+    const currentFile = files.find((f) => f.id === selectedFileId)
+    const curCat = currentFile?.category || ""
+    const curSub = currentFile?.subcategory || ""
+    setSelectedCategory(curCat)
+    setSelectedSubcategory(curSub)
     // availableSubcategories will be populated by effect watching selectedCategory
-    setShowCategoryModal(true);
-  };
+    setShowCategoryModal(true)
+  }
 
   const handleSaveCategory = async () => {
     if (!selectedFileId) {
-      setCategoryError('No file selected');
-      return;
+      setCategoryError("No file selected")
+      return
     }
     if (!selectedCategory) {
-      setCategoryError('Please select a category');
-      return;
+      setCategoryError("Please select a category")
+      return
     }
 
-    setCategoryLoading(true);
-    setCategoryError('');
+    setCategoryLoading(true)
+    setCategoryError("")
     try {
-      const res = await fetch('/api/update-category', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+      const res = await fetch("/api/update-category", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           fileIds: [selectedFileId],
           category: selectedCategory,
-          subcategory: selectedSubcategory || (availableSubcategories[0] || 'General')
-        })
-      });
+          subcategory: selectedSubcategory || availableSubcategories[0] || "General",
+        }),
+      })
 
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Failed to update category');
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Failed to update category")
 
       // update local files state (optimistic)
-      setFiles(prev => prev.map(f => f.id === selectedFileId ? {
-        ...f,
-        category: selectedCategory,
-        subcategory: selectedSubcategory || (availableSubcategories[0] || 'General'),
-        manualCategoryOverride: true
-      } : f));
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === selectedFileId
+            ? {
+              ...f,
+              category: selectedCategory,
+              subcategory: selectedSubcategory || availableSubcategories[0] || "General",
+              manualCategoryOverride: true,
+            }
+            : f,
+        ),
+      )
 
       // also refresh file details (optional) to reflect new category in UI
       try {
-        const refreshed = await fetch(`/api/files?id=${selectedFileId}`);
+        const refreshed = await fetch(`/api/files?id=${selectedFileId}`)
         if (refreshed.ok) {
-          const details = await refreshed.json();
-          setSheetName(details.sheetName || sheetName);
+          const details = await refreshed.json()
+          setSheetName(details.sheetName || sheetName)
           // keep columns/data as they are; metadata updated above
         }
       } catch (e) {
-        console.warn('Could not refresh file details after category update', e);
+        console.warn("Could not refresh file details after category update", e)
       }
 
-      setShowCategoryModal(false);
-      setCategoryLoading(false);
+      setShowCategoryModal(false)
+      setCategoryLoading(false)
     } catch (err) {
-      console.error('Failed to save category:', err);
-      setCategoryError(err.message || 'Failed to update category');
-      setCategoryLoading(false);
+      console.error("Failed to save category:", err)
+      setCategoryError(err.message || "Failed to update category")
+      setCategoryLoading(false)
     }
-  };
+  }
 
   return (
     <div className="flex flex-1 h-full">
@@ -1020,15 +1143,25 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
                     className="text-xl font-bold text-center dark:text-indigo-900 border-b border-indigo-900 bg-transparent px-2"
                     autoFocus
                   />
-                  <button onClick={handleSaveFileName} className="ml-2 px-2 py-1 bg-green-500 text-white rounded">Save</button>
-                  <button onClick={() => setIsEditingFileName(false)} className="ml-1 px-2 py-1 bg-gray-500 text-white rounded">Cancel</button>
+                  <button onClick={handleSaveFileName} className="ml-2 px-2 py-1 bg-green-500 text-white rounded">
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setIsEditingFileName(false)}
+                    className="ml-1 px-2 py-1 bg-gray-500 text-white rounded"
+                  >
+                    Cancel
+                  </button>
                 </div>
               ) : (
                 <div className="flex items-center">
                   <div className="text-xl font-bold dark:text-indigo-900">{fileName}</div>
                   {!isReadOnly && (
                     <button
-                      onClick={() => { setIsEditingFileName(true); setNewFileName(fileName); }}
+                      onClick={() => {
+                        setIsEditingFileName(true)
+                        setNewFileName(fileName)
+                      }}
                       className="ml-2 text-indigo-900 hover:text-indigo-700"
                     >
                       <IconPencil size={18} />
@@ -1040,12 +1173,27 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
 
             {/* Toggle + label (stays with title on mobile) */}
             <div className="ml-0 md:ml-4 flex items-center gap-2">
-              <label htmlFor="readOnlyToggle" className={cn(
-                "relative block h-6 w-12 rounded-full transition-colors [-webkit-tap-highlight-color:_transparent]",
-                isReadOnly ? "bg-yellow-500" : "bg-green-500"
-              )}>
-                <input type="checkbox" id="readOnlyToggle" className="peer sr-only" checked={!isReadOnly} onChange={handleToggleReadOnly} disabled={isLoading} />
-                <span className={cn("absolute inset-y-0 start-0 m-0.5 size-5 rounded-full bg-white transition-all duration-300", isReadOnly ? "start-0" : "start-6")}></span>
+              <label
+                htmlFor="readOnlyToggle"
+                className={cn(
+                  "relative block h-6 w-12 rounded-full transition-colors [-webkit-tap-highlight-color:_transparent]",
+                  isReadOnly ? "bg-yellow-500" : "bg-green-500",
+                )}
+              >
+                <input
+                  type="checkbox"
+                  id="readOnlyToggle"
+                  className="peer sr-only"
+                  checked={!isReadOnly}
+                  onChange={handleToggleReadOnly}
+                  disabled={isLoading}
+                />
+                <span
+                  className={cn(
+                    "absolute inset-y-0 start-0 m-0.5 size-5 rounded-full bg-white transition-all duration-300",
+                    isReadOnly ? "start-0" : "start-6",
+                  )}
+                ></span>
               </label>
               <span className="text-xs font-medium text-indigo-900">{isReadOnly ? "Read-Only" : "Editable"}</span>
             </div>
@@ -1053,10 +1201,31 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
 
           {/* Desktop Actions: hidden on mobile */}
           <div className="hidden md:flex gap-2">
-            <button onClick={handleCustomAnalyze} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">Custom Analyze</button>
-            <button onClick={openCategoryModal} className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600">Change Category</button>
-            <button onClick={() => setShowTransformModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Create Changes in Data through AI</button>
-            <button onClick={handleSaveChanges} disabled={isLoading} className="px-4 py-2 bg-green-600 text-white rounded-lg disabled:opacity-50">Save Changes</button>
+            <button
+              onClick={handleCustomAnalyze}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            >
+              Custom Analyze
+            </button>
+            <button
+              onClick={openCategoryModal}
+              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+            >
+              Change Category
+            </button>
+            <button
+              onClick={() => setShowTransformModal(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Create Changes in Data through AI
+            </button>
+            <button
+              onClick={handleSaveChanges}
+              disabled={isLoading}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg disabled:opacity-50"
+            >
+              Save Changes
+            </button>
           </div>
 
           {/* Mobile Actions: visible only on small screens.
@@ -1064,12 +1233,30 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
               Sticky behavior helps them remain visible when the user scrolls the page on mobile. */}
           <div className="w-full md:hidden sticky top-0 bg-gray-200/80 dark:bg-gray-200/60 backdrop-blur-sm z-30 px-3 py-2 rounded-lg flex flex-col gap-2">
             <div className="flex gap-2 justify-between">
-              <button onClick={handleCustomAnalyze} className="flex-1 px-3 py-2 text-sm rounded bg-purple-600 text-white">Custom</button>
-              <button onClick={openCategoryModal} className="flex-1 px-3 py-2 text-sm rounded bg-orange-500 text-white">Category</button>
+              <button
+                onClick={handleCustomAnalyze}
+                className="flex-1 px-3 py-2 text-sm rounded bg-purple-600 text-white"
+              >
+                Custom
+              </button>
+              <button onClick={openCategoryModal} className="flex-1 px-3 py-2 text-sm rounded bg-orange-500 text-white">
+                Category
+              </button>
             </div>
             <div className="flex gap-2 justify-between">
-              <button onClick={() => setShowTransformModal(true)} className="flex-1 px-3 py-2 text-sm rounded bg-blue-600 text-white">Transform</button>
-              <button onClick={handleSaveChanges} disabled={isLoading} className="flex-1 px-3 py-2 text-sm rounded bg-green-600 text-white disabled:opacity-50">Save</button>
+              <button
+                onClick={() => setShowTransformModal(true)}
+                className="flex-1 px-3 py-2 text-sm rounded bg-blue-600 text-white"
+              >
+                Transform
+              </button>
+              <button
+                onClick={handleSaveChanges}
+                disabled={isLoading}
+                className="flex-1 px-3 py-2 text-sm rounded bg-green-600 text-white disabled:opacity-50"
+              >
+                Save
+              </button>
             </div>
           </div>
         </div>
@@ -1090,8 +1277,10 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
                   className="w-full rounded border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2  text-indigo-900"
                 >
                   <option value="">(Choose category)</option>
-                  {categoryOptions.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
+                  {categoryOptions.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -1105,8 +1294,10 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
                   className="w-full rounded border border-gray-300 p-2 text-sm focus:outline-none focus:ring-2  disabled:opacity-60 text-indigo-900"
                 >
                   <option value="">{selectedCategory ? "(Select subcategory)" : "(N/A)"}</option>
-                  {availableSubcategories.map(s => (
-                    <option key={s} value={s}>{s}</option>
+                  {availableSubcategories.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -1114,8 +1305,8 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
               <div className="flex justify-end gap-2">
                 <button
                   onClick={() => {
-                    setShowCategoryModal(false);
-                    setCategoryError('');
+                    setShowCategoryModal(false)
+                    setCategoryError("")
                   }}
                   className="px-4 py-2 bg-gray-500 text-white rounded-lg"
                 >
@@ -1126,7 +1317,7 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
                   disabled={categoryLoading}
                   className="px-4 py-2 bg-orange-500 text-white rounded-lg disabled:opacity-50"
                 >
-                  {categoryLoading ? 'Saving...' : 'Save Category'}
+                  {categoryLoading ? "Saving..." : "Save Category"}
                 </button>
               </div>
             </div>
@@ -1155,7 +1346,7 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
                   disabled={isAnalysisLoading}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50"
                 >
-                  {isAnalysisLoading ? 'Analyzing...' : 'Run Analysis'}
+                  {isAnalysisLoading ? "Analyzing..." : "Run Analysis"}
                 </button>
               </div>
             </div>
@@ -1165,9 +1356,7 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
         {showTransformModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white p-6 rounded-lg w-full max-w-2xl">
-              <h3 className="text-lg font-semibold mb-4 dark:text-black">
-                Transform Data with AI
-              </h3>
+              <h3 className="text-lg font-semibold mb-4 dark:text-black">Transform Data with AI</h3>
               <textarea
                 value={transformPrompt}
                 onChange={(e) => setTransformPrompt(e.target.value)}
@@ -1186,7 +1375,7 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
                   disabled={isAnalysisLoading}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50"
                 >
-                  {isAnalysisLoading ? 'Transforming...' : 'Transform Data'}
+                  {isAnalysisLoading ? "Transforming..." : "Transform Data"}
                 </button>
               </div>
             </div>
@@ -1199,14 +1388,12 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
               <h3 className="text-lg font-semibold mb-4 dark:text-black">Add New Row</h3>
               {error && <div className="text-red-500 mb-4">{error}</div>}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 max-h-[50vh] overflow-y-auto">
-                {columns.map(col => (
+                {columns.map((col) => (
                   <div key={col} className="mb-3">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-black mb-1">
-                      {col}
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-black mb-1">{col}</label>
                     <input
                       type="text"
-                      value={newRowData[col] || ''}
+                      value={newRowData[col] || ""}
                       onChange={(e) => handleRowInputChange(col, e.target.value)}
                       className="w-full border rounded-lg p-2 dark:text-black"
                       placeholder={`Enter ${col}`}
@@ -1217,18 +1404,15 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
               <div className="flex justify-end gap-2">
                 <button
                   onClick={() => {
-                    setShowAddRowModal(false);
-                    setNewRowData({});
-                    setError('');
+                    setShowAddRowModal(false)
+                    setNewRowData({})
+                    setError("")
                   }}
                   className="px-4 py-2 bg-gray-300 rounded-lg dark:text-black"
                 >
                   Cancel
                 </button>
-                <button
-                  onClick={handleAddRow}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg"
-                >
+                <button onClick={handleAddRow} className="px-4 py-2 bg-blue-600 text-white rounded-lg">
                   Add Row
                 </button>
               </div>
@@ -1241,9 +1425,7 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
             <div className="bg-white p-6 rounded-lg w-full max-w-2xl">
               <h3 className="text-lg font-semibold mb-4 dark:text-black">Add New Column</h3>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-black">
-                  Column Name
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-black">Column Name</label>
                 <input
                   value={newColumnName}
                   onChange={(e) => setNewColumnName(e.target.value)}
@@ -1253,18 +1435,18 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
               </div>
 
               <div className="max-h-[50vh] overflow-y-auto">
-                <h4 className="text-md font-medium mb-3 dark:text-black">
-                  Enter values for each row:
-                </h4>
+                <h4 className="text-md font-medium mb-3 dark:text-black">Enter values for each row:</h4>
                 {data.map((_, index) => (
                   <div key={index} className="flex items-center mb-2">
                     <span className="mr-2 w-16 dark:text-black">Row {index + 1}:</span>
                     <input
-                      value={newColumnRowValues[index] || ''}
-                      onChange={(e) => setNewColumnRowValues(prev => ({
-                        ...prev,
-                        [index]: e.target.value
-                      }))}
+                      value={newColumnRowValues[index] || ""}
+                      onChange={(e) =>
+                        setNewColumnRowValues((prev) => ({
+                          ...prev,
+                          [index]: e.target.value,
+                        }))
+                      }
                       className="flex-1 p-2 border rounded dark:border-black dark:text-black"
                       placeholder={`Value for row ${index + 1}`}
                     />
@@ -1276,19 +1458,16 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
               <div className="flex justify-end gap-2 mt-4">
                 <button
                   onClick={() => {
-                    setShowAddColumnModal(false);
-                    setNewColumnName('');
-                    setNewColumnRowValues({});
-                    setError('');
+                    setShowAddColumnModal(false)
+                    setNewColumnName("")
+                    setNewColumnRowValues({})
+                    setError("")
                   }}
                   className="px-4 py-2 bg-gray-300 rounded-lg dark:text-black"
                 >
                   Cancel
                 </button>
-                <button
-                  onClick={handleAddColumn}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg"
-                >
+                <button onClick={handleAddColumn} className="px-4 py-2 bg-blue-600 text-white rounded-lg">
                   Add Column
                 </button>
               </div>
@@ -1299,12 +1478,10 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
         {columnToRemove && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white p-6 rounded-lg w-full max-w-md">
-              <h3 className="text-lg font-semibold mb-4 dark:text-black">
-                Confirm Column Removal
-              </h3>
+              <h3 className="text-lg font-semibold mb-4 dark:text-black">Confirm Column Removal</h3>
               <p className="mb-4 text-indigo-900">
-                Are you sure you want to remove the column: <strong>{columnToRemove}</strong>?
-                This action cannot be undone.
+                Are you sure you want to remove the column: <strong>{columnToRemove}</strong>? This action cannot be
+                undone.
               </p>
               {error && <div className="text-red-500 mb-2">{error}</div>}
               <div className="flex justify-end gap-2">
@@ -1331,10 +1508,7 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
             <div className="whitespace-pre-line text-gray-700 text-base leading-relaxed max-h-[200px] overflow-y-auto">
               {analysis}
             </div>
-            <button
-              onClick={() => setAnalysis('')}
-              className="mt-4 text-red-600 hover:text-red-700 font-medium"
-            >
+            <button onClick={() => setAnalysis("")} className="mt-4 text-red-600 hover:text-red-700 font-medium">
               Close Analysis
             </button>
           </div>
@@ -1343,17 +1517,17 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-indigo-900">Select File</label>
             <select
-              value={selectedFileId || ''}
+              value={selectedFileId || ""}
               onChange={(e) => {
-                setSelectedFileId(e.target.value);
-                const selectedFile = files.find(f => f.id === e.target.value);
-                setIsReadOnly(selectedFile?.readOnly || false);
+                setSelectedFileId(e.target.value)
+                const selectedFile = files.find((f) => f.id === e.target.value)
+                setIsReadOnly(selectedFile?.readOnly || false)
               }}
               className="w-full border rounded-lg p-2 bg-white shadow-md"
               disabled={isLoading}
             >
               <option value="">Select a file</option>
-              {files.map(file => (
+              {files.map((file) => (
                 <option key={file.id} value={file.id}>
                   {file.filename}
                   {file.readOnly && " (Read-Only)"}
@@ -1364,7 +1538,7 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
           </div>
           {isLoading && (
             <div className="flex justify-center mt-20">
-              <Hourglass size="40" bgOpacity="0.1" speed="1.75" color="#312e81" />
+              <Hourglass size="40" color="#312e81" />
             </div>
           )}
           {error && <div className="text-center text-red-600 mb-4">{error}</div>}
@@ -1411,13 +1585,25 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
                   {data.map((row, index) => (
                     <tr key={index} className="bg-white border-b hover:bg-gray-50 dark:hover:bg-gray-200">
                       {columns.map((col) => (
-                        <td key={col} className="px-6 py-4">{row[col] || ''}</td>
+                        <td key={col} className="px-6 py-4">
+                          {row[col] || ""}
+                        </td>
                       ))}
                       <td className="px-6 py-4 space-x-3">
                         {!isReadOnly && (
                           <>
-                            <button onClick={() => handleEdit(index)} className="font-medium text-blue-600 hover:underline">Edit</button>
-                            <button onClick={() => handleRemove(index)} className="font-medium text-red-600 hover:underline">Remove</button>
+                            <button
+                              onClick={() => handleEdit(index)}
+                              className="font-medium text-blue-600 hover:underline"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleRemove(index)}
+                              className="font-medium text-red-600 hover:underline"
+                            >
+                              Remove
+                            </button>
                           </>
                         )}
                       </td>
@@ -1438,14 +1624,19 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
                   <input
                     type="text"
                     name={key}
-                    value={editData[key] || ''}
+                    value={editData[key] || ""}
                     onChange={handleChange}
                     className="w-full border rounded-lg p-2 dark:text-black"
                   />
                 </div>
               ))}
               <div className="flex justify-end space-x-2">
-                <button onClick={() => setEditingIndex(null)} className="px-4 py-2 bg-gray-300 rounded-lg dark:text-black">Cancel</button>
+                <button
+                  onClick={() => setEditingIndex(null)}
+                  className="px-4 py-2 bg-gray-300 rounded-lg dark:text-black"
+                >
+                  Cancel
+                </button>
                 <button
                   disabled={editingIndex === null}
                   onClick={handleSave}
@@ -1459,30 +1650,34 @@ function DashboardContent({ selectedFileId: propSelectedFileId }) {
         )}
       </div>
     </div>
-  );
+  )
 }
 // Wrap DashboardContent with Suspense
 function Dashboard({ selectedFileId }) {
   return (
-    <Suspense fallback={
-      <div className="flex justify-center items-center h-full">
-        <Hourglass size="30" color="#312e81" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex justify-center items-center h-full">
+          <Hourglass size="30" color="#312e81" />
+        </div>
+      }
+    >
       <DashboardContent selectedFileId={selectedFileId} />
     </Suspense>
-  );
+  )
 }
 
 // Wrap SidebarContent with Suspense
 export default function SidebarDemo() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <Hourglass size="50" color="#312e81" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-white flex items-center justify-center">
+          <Hourglass size="50" color="#312e81" />
+        </div>
+      }
+    >
       <SidebarContent />
     </Suspense>
-  );
+  )
 }
