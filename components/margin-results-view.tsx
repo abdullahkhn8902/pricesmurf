@@ -1,4 +1,3 @@
-// components/margin-results-view.tsx
 "use client"
 
 import { useState, useEffect } from "react"
@@ -394,17 +393,7 @@ export function MarginResultsView({ results, fileName: initialFileName, onClose 
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-500" />
-              <div>
-                <p className="text-sm text-muted-foreground">Period</p>
-                <p className="text-sm font-medium">{safeString(resultsData?.time_window)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+
       </div>
 
       {/* Key Insights */}

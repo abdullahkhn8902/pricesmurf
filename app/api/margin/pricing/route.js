@@ -143,7 +143,7 @@ export async function POST(request) {
     const queryFileId = searchParams.get("fileId")
 
     // Prefer query param, fallback to body.fileId or body.id
-    let incomingFileId = queryFileId || body.fileId || body.id || null
+    const incomingFileId = queryFileId || body.fileId || body.id || null
     const filenameFallback = body.filename || body.fileName || null
 
     // Log what we received
@@ -163,7 +163,11 @@ export async function POST(request) {
       const filenameToFind = (filenameFallback || incomingFileId).toString()
       fileQuery = { filename: filenameToFind, "metadata.userId": clerkUserId }
     } else {
-      logger.warn("Invalid or missing file identifier", { request_id: requestId, user_id: clerkUserId, file_id: incomingFileId })
+      logger.warn("Invalid or missing file identifier", {
+        request_id: requestId,
+        user_id: clerkUserId,
+        file_id: incomingFileId,
+      })
       return NextResponse.json({ error: "Invalid file ID" }, { status: 400 })
     }
 
@@ -189,7 +193,11 @@ export async function POST(request) {
     const chunks = []
     for await (const chunk of downloadStream) chunks.push(chunk)
     if (!chunks.length) {
-      logger.warn("Downloaded file had no data", { request_id: requestId, user_id: clerkUserId, file_id: resolvedFileId?.toString?.() ?? String(resolvedFileId) })
+      logger.warn("Downloaded file had no data", {
+        request_id: requestId,
+        user_id: clerkUserId,
+        file_id: resolvedFileId?.toString?.() ?? String(resolvedFileId),
+      })
       return NextResponse.json({ error: "Downloaded file is empty" }, { status: 400 })
     }
     const buffer = Buffer.concat(chunks)
@@ -200,7 +208,11 @@ export async function POST(request) {
     const { columns, data } = await processFileData(buffer, filename, contentType)
 
     if (!columns.length || !data.length) {
-      logger.warn("No valid data found in file", { request_id: requestId, user_id: clerkUserId, file_id: resolvedFileId?.toString?.() ?? String(resolvedFileId) })
+      logger.warn("No valid data found in file", {
+        request_id: requestId,
+        user_id: clerkUserId,
+        file_id: resolvedFileId?.toString?.() ?? String(resolvedFileId),
+      })
       return NextResponse.json({ error: "No valid data found" }, { status: 400 })
     }
 
@@ -231,8 +243,7 @@ export async function POST(request) {
       }
     }
 
-    // Build prompt for pricing analysis
-    const sampleRows = data.slice(0, 50)
+    const sampleRows = data.slice(0, 200)
     const dataString = JSON.stringify({ columns, data: sampleRows }, null, 2)
 
     const analyze_fields = body?.analyze_fields ?? ["list_price", "net_price", "discount_pct", "cost"]
@@ -241,41 +252,68 @@ export async function POST(request) {
 
     const prompt =
       (customPrompt && customPrompt.toString().trim()) ||
-      `Analyze the pricing structure of this dataset for margin leakage detection:
+      `You are an expert pricing analyst. Analyze the pricing structure and discount patterns from this ACTUAL dataset.
 
-Columns: ${JSON.stringify(columns)}
-Sample Data (first ${sampleRows.length} rows): ${dataString}
+DATASET COLUMNS: ${JSON.stringify(columns)}
+DATASET SAMPLE (${sampleRows.length} rows from ${data.length} total):
+${dataString}
 
-Focus on these pricing fields: ${JSON.stringify(analyze_fields)}
-Price thresholds: ${JSON.stringify(price_thresholds)}
+ANALYSIS REQUIREMENTS:
+1. Calculate REAL pricing metrics from the actual data
+2. Identify discount patterns and anomalies
+3. Find products with excessive discounts
+4. Analyze price-cost relationships
+5. Provide specific insights based on actual numbers
 
-Provide detailed pricing analysis in this JSON format:
+CRITICAL: Use ONLY the actual data provided. Calculate real averages, identify real products with issues.
+
+Return ONLY valid JSON in this exact format:
 {
-  "total_products": number,
-  "avg_list_price": number,
-  "avg_net_price": number,
-  "avg_discount_pct": number,
-  "price_range": {"min": number, "max": number},
-  "discount_distribution": {"0-10%": count, "10-25%": count, "25-50%": count, "50%+": count},
-  "high_discount_products": [{"product_id": "...", "discount_pct": number}],
-  "pricing_insights": ["insight1", "insight2", "insight3"],
-  "sql": "SELECT query to analyze pricing patterns and identify high discounts",
-  "samples": [{"product_id": "...", "list_price": 100, "net_price": 80, "discount_pct": 20}]
+  "total_products": <actual count from data>,
+  "avg_list_price": <calculated from actual list_price values>,
+  "avg_net_price": <calculated from actual net_price values>,
+  "avg_discount_pct": <calculated from actual data>,
+  "price_range": {
+    "min": <actual minimum price>,
+    "max": <actual maximum price>
+  },
+  "discount_distribution": {
+    "0-10%": <count of products>,
+    "10-25%": <count>,
+    "25-50%": <count>,
+    "50%+": <count>
+  },
+  "high_discount_products": [
+    {
+      "product_id": "<actual product ID>",
+      "list_price": <actual value>,
+      "net_price": <actual value>,
+      "discount_pct": <calculated>,
+      "quantity": <actual if available>
+    }
+  ],
+  "pricing_insights": [
+    "<specific insight about actual pricing patterns>",
+    "<discount anomalies found in real data>",
+    "<actionable recommendation>"
+  ],
+  "sql": "SELECT product_id, list_price, net_price, (list_price - net_price) / list_price * 100 as discount_pct FROM pricing_data WHERE (list_price - net_price) / list_price > 0.25 ORDER BY discount_pct DESC LIMIT 50",
+  "samples": [<array of 5-10 actual rows with pricing issues>]
 }`
 
-    const model = vertexAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" })
+    const model = vertexAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" })
 
     logger.info("Calling Vertex AI for pricing analysis", {
       request_id: requestId,
       user_id: clerkUserId,
-      model: "gemini-2.5-flash-lite",
+      model: "gemini-2.0-flash-exp",
     })
 
     const startTs = Date.now()
     logger.info("vertex_call_start", {
       request_id: requestId,
       user_id: clerkUserId,
-      model: "gemini-2.5-flash-lite",
+      model: "gemini-2.0-flash-exp",
       masked_token: maskSecret(process.env.VERTEX_AI_KEY || process.env.GOOGLE_APPLICATION_CREDENTIALS || "sa-key"),
       note: "pricing_analysis_start",
     })
@@ -291,15 +329,17 @@ Provide detailed pricing analysis in this JSON format:
 
       const usage = response?.usageMetadata ?? response?.usage_metadata ?? response?.usage ?? null
       const promptTokens = usage?.promptTokenCount ?? usage?.prompt_token_count ?? usage?.prompt_tokens ?? null
-      const candidatesTokens = usage?.candidatesTokenCount ?? usage?.candidates_token_count ?? usage?.candidates_tokens ?? null
-      const totalTokens = usage?.totalTokenCount ?? usage?.total_token_count ?? (Number(promptTokens) + Number(candidatesTokens) || null)
+      const candidatesTokens =
+        usage?.candidatesTokenCount ?? usage?.candidates_token_count ?? usage?.candidates_tokens ?? null
+      const totalTokens =
+        usage?.totalTokenCount ?? usage?.total_token_count ?? (Number(promptTokens) + Number(candidatesTokens) || null)
 
       const durationMs = Date.now() - startTs
 
       logger.info("Vertex AI pricing analysis successful", {
         request_id: requestId,
         user_id: clerkUserId,
-        model: "gemini-2.5-flash-lite",
+        model: "gemini-2.0-flash-exp",
         duration_ms: durationMs,
         prompt_tokens: promptTokens,
         candidates_tokens: candidatesTokens,
@@ -310,31 +350,47 @@ Provide detailed pricing analysis in this JSON format:
 
       let analysisObj = null
       try {
-        analysisObj = JSON.parse(rawText)
+        let jsonText = rawText.trim()
+        if (jsonText.includes("```json")) {
+          const match = jsonText.match(/```json\s*([\s\S]*?)\s*```/)
+          if (match) jsonText = match[1].trim()
+        } else if (jsonText.includes("```")) {
+          const match = jsonText.match(/```\s*([\s\S]*?)\s*```/)
+          if (match) jsonText = match[1].trim()
+        }
+
+        analysisObj = JSON.parse(jsonText)
+
+        if (!analysisObj.total_products) {
+          throw new Error("Invalid pricing analysis structure")
+        }
       } catch (parseErr) {
-        logger.warn("Failed to parse Vertex AI response as JSON, returning fallback structure", {
+        logger.error("Failed to parse pricing analysis", {
           request_id: requestId,
           user_id: clerkUserId,
           parse_error: parseErr?.message || String(parseErr),
+          response_preview: rawText.substring(0, 500),
         })
 
-        analysisObj = {
-          total_products: data.length,
-          avg_discount_pct: null,
-          pricing_insights: ["Pricing analysis completed", "Unable to parse detailed analysis from model"],
-          sql: "SELECT product_id, list_price, net_price, discount_pct FROM pricing_data WHERE discount_pct > 25",
-          samples: data.slice(0, 5),
-          raw_text: rawText,
-        }
+        return NextResponse.json(
+          {
+            error: "AI pricing analysis failed",
+            details: "The AI model did not return valid pricing analysis. Please try again.",
+            raw_response: process.env.NODE_ENV === "development" ? rawText : undefined,
+          },
+          { status: 500 },
+        )
       }
 
       // Store analysis into DB - use resolvedFileId from the file doc
       try {
-        await db.collection("pricingAnalyses").updateOne(
-          { fileId: resolvedFileId, userId: clerkUserId },
-          { $set: { analysis: analysisObj, updatedAt: new Date(), model: "gemini-2.5-flash-lite" } },
-          { upsert: true }
-        )
+        await db
+          .collection("pricingAnalyses")
+          .updateOne(
+            { fileId: resolvedFileId, userId: clerkUserId },
+            { $set: { analysis: analysisObj, updatedAt: new Date(), model: "gemini-2.0-flash-exp" } },
+            { upsert: true },
+          )
         logger.info("Analysis stored in database", {
           request_id: requestId,
           user_id: clerkUserId,
@@ -353,13 +409,16 @@ Provide detailed pricing analysis in this JSON format:
         logger.info("vertex_call_end", {
           request_id: requestId,
           user_id: clerkUserId,
-          model: "gemini-2.5-flash-lite",
+          model: "gemini-2.0-flash-exp",
           duration_ms: durationMs,
           analysis_length: rawText.length,
           note: "vertex_call_end",
         })
       } catch (logErr) {
-        logger.error("vertex_call_end_logging_error", { request_id: requestId, error: logErr?.message || String(logErr) })
+        logger.error("vertex_call_end_logging_error", {
+          request_id: requestId,
+          error: logErr?.message || String(logErr),
+        })
       }
 
       const sheetName = filename.includes(".") ? filename.split(".")[0] : "Unnamed Sheet"
@@ -380,14 +439,14 @@ Provide detailed pricing analysis in this JSON format:
           data: data.slice(0, 100),
           analysis: analysisObj,
         },
-        { status: 200 }
+        { status: 200 },
       )
     } catch (vErr) {
       const durationMs = Date.now() - startTs
       logger.error("vertex_call_error", {
         request_id: requestId,
         user_id: clerkUserId,
-        model: "gemini-2.5-flash-lite",
+        model: "gemini-2.0-flash-exp",
         duration_ms: durationMs,
         error: vErr?.message || String(vErr),
         note: "pricing_analysis_error",
@@ -408,7 +467,7 @@ Provide detailed pricing analysis in this JSON format:
         details: error?.message || String(error),
         ...(process.env.NODE_ENV === "development" && { stack: error?.stack }),
       },
-      { status: 500 }
+      { status: 500 },
     )
   } finally {
     try {

@@ -243,37 +243,61 @@ export async function POST(request: Request) {
     const cost_fields = body?.cost_fields ?? ["cost", "cogs", "unit_cost"]
     const margin_thresholds = body?.margin_thresholds ?? { min_margin_pct: 10, target_margin_pct: 30 }
 
-    const sampleData = data.slice(0, 50)
+    const sampleData = data.slice(0, 200)
     const dataString = JSON.stringify({ columns, data: sampleData }, null, 2)
-    const prompt = `Analyze the cost and margin structure of this dataset for margin leakage detection:
 
-Data:
+    const prompt = `You are an expert financial analyst specializing in margin analysis. Analyze the cost and margin structure from this ACTUAL dataset.
+
+DATASET COLUMNS: ${JSON.stringify(columns)}
+DATASET SAMPLE (${sampleData.length} rows from ${data.length} total):
 ${dataString}
 
-Focus on cost fields: ${JSON.stringify(cost_fields)}
-Margin thresholds: ${JSON.stringify(margin_thresholds)}
+ANALYSIS REQUIREMENTS:
+1. Calculate margins as: (net_price - cost) / net_price * 100 using ACTUAL values from the data
+2. Identify products with negative margins (selling below cost)
+3. Find products below target margin threshold (${margin_thresholds.target_margin_pct}%)
+4. Calculate the REAL revenue impact of margin issues
+5. Provide specific product IDs and actual numbers from the dataset
 
-Calculate margins as: (net_price - cost) / net_price * 100
+CRITICAL: Use ONLY the actual data provided above. Do NOT generate fake product IDs or estimated numbers. Extract real values from the dataset.
 
-Provide detailed cost margin analysis in this JSON format:
+Return ONLY valid JSON in this exact format (no markdown, no explanations):
 {
-  "total_products": number,
-  "avg_margin_pct": number,
-  "negative_margin_count": number,
-  "below_target_count": number,
-  "margin_distribution": {"negative": count, "0-10%": count, "10-30%": count, "30%+": count},
-  "worst_performers": [{"product_id": "...", "margin_pct": -5, "revenue_impact": 1000, "cost": 100, "net_price": 95}],
-  "cost_insights": ["insight1", "insight2", "insight3"],
-  "sql": "SELECT query to find products with negative or low margins",
-  "samples": [{"product_id": "...", "cost": 80, "net_price": 75, "margin_pct": -6.67}]
+  "total_products": <actual count from data>,
+  "avg_margin_pct": <calculated average from actual data>,
+  "negative_margin_count": <actual count of products where net_price < cost>,
+  "below_target_count": <actual count where margin < ${margin_thresholds.target_margin_pct}%>,
+  "margin_distribution": {
+    "negative": <count>,
+    "0-10%": <count>,
+    "10-30%": <count>,
+    "30%+": <count>
+  },
+  "worst_performers": [
+    {
+      "product_id": "<actual product ID from data>",
+      "margin_pct": <calculated from actual cost and net_price>,
+      "revenue_impact": <actual revenue or quantity * price>,
+      "cost": <actual cost from data>,
+      "net_price": <actual net_price from data>,
+      "quantity": <actual quantity if available>
+    }
+  ],
+  "cost_insights": [
+    "<specific insight about actual cost issues found>",
+    "<pattern identified in the real data>",
+    "<actionable recommendation based on actual numbers>"
+  ],
+  "sql": "SELECT product_id, cost, net_price, (net_price - cost) / net_price * 100 as margin_pct, quantity FROM pricing_data WHERE (net_price - cost) / net_price * 100 < ${margin_thresholds.target_margin_pct} ORDER BY margin_pct ASC LIMIT 50",
+  "samples": [<array of 5-10 actual rows with margin issues>]
 }`
 
-    const model = vertexAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" })
+    const model = vertexAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" })
 
     logger.info("Calling Vertex AI (generateContent)", {
       request_id: requestId,
       user_id: clerkUserId,
-      model: "gemini-2.5-flash-lite",
+      model: "gemini-2.0-flash-exp",
       masked_token: maskSecret(process.env.VERTEX_AI_KEY ?? process.env.GOOGLE_APPLICATION_CREDENTIALS),
     })
 
@@ -318,35 +342,40 @@ Provide detailed cost margin analysis in this JSON format:
     // Extract text generically
     const responseText =
       result?.response?.candidates?.[0]?.content?.parts?.[0]?.text ?? result?.output?.[0]?.content?.[0]?.text ?? null
-    const analysisRaw: string = responseText ?? "No analysis generated"
+    const analysisRaw: string = responseText ?? ""
 
     let parsedAnalysis: any = null
     try {
-      parsedAnalysis = JSON.parse(analysisRaw)
-    } catch {
-      logger.info("Vertex returned non-JSON analysis; returning raw text", { request_id: requestId })
-      parsedAnalysis = {
-        total_products: data.length,
-        avg_margin_pct: 25,
-        negative_margin_count: 0,
-        below_target_count: Math.floor(data.length * 0.2),
-        margin_distribution: {
-          negative: 0,
-          "0-10%": Math.floor(data.length * 0.1),
-          "10-30%": Math.floor(data.length * 0.3),
-          "30%+": Math.floor(data.length * 0.6),
-        },
-        worst_performers: data.slice(0, 5).map((row: any, i: number) => ({
-          product_id: row.product_id || `P${i + 1}`,
-          margin_pct: 15 - i * 3,
-          revenue_impact: 1000 + i * 500,
-          cost: 80 + i * 10,
-          net_price: 95 + i * 5,
-        })),
-        cost_insights: ["Cost margin analysis completed", "Review products with margins below target threshold"],
-        sql: "SELECT product_id, cost, net_price, (net_price - cost) / net_price * 100 as margin_pct FROM pricing_data WHERE (net_price - cost) / net_price * 100 < 10",
-        samples: data.slice(0, 5),
+      // Try to extract JSON from markdown code blocks if present
+      let jsonText = analysisRaw.trim()
+      if (jsonText.includes("```json")) {
+        const match = jsonText.match(/```json\s*([\s\S]*?)\s*```/)
+        if (match) jsonText = match[1].trim()
+      } else if (jsonText.includes("```")) {
+        const match = jsonText.match(/```\s*([\s\S]*?)\s*```/)
+        if (match) jsonText = match[1].trim()
       }
+
+      parsedAnalysis = JSON.parse(jsonText)
+
+      // Validate that we got actual data, not mock data
+      if (!parsedAnalysis.total_products || !Array.isArray(parsedAnalysis.worst_performers)) {
+        throw new Error("Invalid response structure from Gemini")
+      }
+    } catch (parseErr) {
+      logger.error("Failed to parse Gemini response as valid JSON", {
+        request_id: requestId,
+        error: String(parseErr),
+        response_preview: analysisRaw.substring(0, 500),
+      })
+      return NextResponse.json(
+        {
+          error: "AI analysis failed to return valid data",
+          details: "The AI model did not return properly structured cost analysis. Please try again.",
+          raw_response: process.env.NODE_ENV === "development" ? analysisRaw : undefined,
+        },
+        { status: 500 },
+      )
     }
 
     // Persist analysis

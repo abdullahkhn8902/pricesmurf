@@ -6,10 +6,13 @@ import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Check, X, RotateCcw, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
+// @ts-ignore
+import { Hourglass } from "ldrs/react"
+import "ldrs/react/Hourglass.css"
 
 interface LoaderSequenceProps {
   fileId: string
-  runId?: string           // <-- optional runId added
+  runId?: string // <-- optional runId added
   onComplete: (results: any) => void
   onError: (error: string) => void
 }
@@ -33,6 +36,7 @@ export function LoaderSequence({ fileId, runId, onComplete, onError }: LoaderSeq
   const [currentStep, setCurrentStep] = useState(0)
   const [stepResults, setStepResults] = useState<Record<string, StepResult>>({})
   const [isRetrying, setIsRetrying] = useState(false)
+  const [showHourglassLoader, setShowHourglassLoader] = useState(false)
 
   useEffect(() => {
     // Initialize all steps as pending
@@ -112,7 +116,9 @@ export function LoaderSequence({ fileId, runId, onComplete, onError }: LoaderSeq
             break
           case "logical":
             // accept array or string
-            summary = Array.isArray(result.insights) ? result.insights.join(", ") : result.insights ?? result.message ?? "All logical checks passed"
+            summary = Array.isArray(result.insights)
+              ? result.insights.join(", ")
+              : (result.insights ?? result.message ?? "All logical checks passed")
             break
         }
 
@@ -145,6 +151,8 @@ export function LoaderSequence({ fileId, runId, onComplete, onError }: LoaderSeq
   }
 
   const finalizeAndReturn = async () => {
+    setShowHourglassLoader(true)
+
     // Build finalResults from stepResults data (map to the UI shape)
     const finalResults: any = {
       counting: stepResults["count"]?.data ?? {},
@@ -216,105 +224,114 @@ export function LoaderSequence({ fileId, runId, onComplete, onError }: LoaderSeq
 
   return (
     <div className="space-y-6 py-4">
-      {/* Progress Bar */}
-      <div className="space-y-2">
-        <div className="flex justify-between text-sm">
-          <span>Progress</span>
-          <span>{Math.round(progress)}%</span>
+      {showHourglassLoader ? (
+        <div className="flex flex-col items-center justify-center py-12 space-y-4">
+          <Hourglass size="50" color="#312e81" />
+          <p className="text-sm text-muted-foreground">Preparing your results...</p>
         </div>
-        <Progress value={progress} className="h-2" />
-      </div>
-
-      {/* Steps List */}
-      <div className="space-y-3">
-        {STEPS.map((step, index) => {
-          const result = stepResults[step.id]
-          const isActive = currentStep === index && result?.status === "loading"
-
-          return (
-            <div
-              key={step.id}
-              className={cn(
-                "flex items-center gap-3 p-3 rounded-lg border transition-colors",
-                isActive && "bg-muted/50 border-primary",
-                result?.status === "success" && "bg-green-50 border-green-200",
-                result?.status === "error" && "bg-red-50 border-red-200",
-              )}
-            >
-              {/* Status Icon */}
-              <div className="flex-shrink-0">
-                {result?.status === "loading" && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
-                {result?.status === "success" && <Check className="h-4 w-4 text-green-600" />}
-                {result?.status === "error" && <X className="h-4 w-4 text-red-600" />}
-                {result?.status === "pending" && (
-                  <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />
-                )}
-              </div>
-
-              {/* Step Info */}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">{step.label}</p>
-                {result?.summary && <p className="text-xs text-muted-foreground mt-1">{result.summary}</p>}
-                {result?.error && <p className="text-xs text-red-600 mt-1">{result.error}</p>}
-              </div>
-
-              {/* Step Number */}
-              <div className="flex-shrink-0 text-xs text-muted-foreground">
-                {index + 1}/{STEPS.length}
-              </div>
+      ) : (
+        <>
+          {/* Progress Bar */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span>Progress</span>
+              <span>{Math.round(progress)}%</span>
             </div>
-          )
-        })}
-      </div>
+            <Progress value={progress} className="h-2" />
+          </div>
 
-      {/* Error Actions */}
-      {hasError && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            {errorStep && `Failed at step: ${errorStep.label}. ${stepResults[errorStep.id]?.error}`}
-          </AlertDescription>
-        </Alert>
-      )}
+          {/* Steps List */}
+          <div className="space-y-3">
+            {STEPS.map((step, index) => {
+              const result = stepResults[step.id]
+              const isActive = currentStep === index && result?.status === "loading"
 
-      {hasError && (
-        <div className="flex gap-3">
-          <Button onClick={handleRetry} disabled={isRetrying} size="sm">
-            {isRetrying ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Retrying...
-              </>
-            ) : (
-              <>
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Retry
-              </>
-            )}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              // Download debug log functionality
-              const debugData = {
-                fileId,
-                runId,
-                steps: stepResults,
-                timestamp: new Date().toISOString(),
-              }
-              const blob = new Blob([JSON.stringify(debugData, null, 2)], { type: "application/json" })
-              const url = URL.createObjectURL(blob)
-              const a = document.createElement("a")
-              a.href = url
-              a.download = "debug-log.json"
-              a.click()
-              URL.revokeObjectURL(url)
-            }}
-          >
-            Download Debug Log
-          </Button>
-        </div>
+              return (
+                <div
+                  key={step.id}
+                  className={cn(
+                    "flex items-center gap-3 p-3 rounded-lg border transition-colors",
+                    isActive && "bg-muted/50 border-primary",
+                    result?.status === "success" && "bg-green-50 border-green-200",
+                    result?.status === "error" && "bg-red-50 border-red-200",
+                  )}
+                >
+                  {/* Status Icon */}
+                  <div className="flex-shrink-0">
+                    {result?.status === "loading" && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+                    {result?.status === "success" && <Check className="h-4 w-4 text-green-600" />}
+                    {result?.status === "error" && <X className="h-4 w-4 text-red-600" />}
+                    {result?.status === "pending" && (
+                      <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />
+                    )}
+                  </div>
+
+                  {/* Step Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{step.label}</p>
+                    {result?.summary && <p className="text-xs text-muted-foreground mt-1">{result.summary}</p>}
+                    {result?.error && <p className="text-xs text-red-600 mt-1">{result.error}</p>}
+                  </div>
+
+                  {/* Step Number */}
+                  <div className="flex-shrink-0 text-xs text-muted-foreground">
+                    {index + 1}/{STEPS.length}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Error Actions */}
+          {hasError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                {errorStep && `Failed at step: ${errorStep.label}. ${stepResults[errorStep.id]?.error}`}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {hasError && (
+            <div className="flex gap-3">
+              <Button onClick={handleRetry} disabled={isRetrying} size="sm">
+                {isRetrying ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Retrying...
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Retry
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  // Download debug log functionality
+                  const debugData = {
+                    fileId,
+                    runId,
+                    steps: stepResults,
+                    timestamp: new Date().toISOString(),
+                  }
+                  const blob = new Blob([JSON.stringify(debugData, null, 2)], { type: "application/json" })
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement("a")
+                  a.href = url
+                  a.download = "debug-log.json"
+                  a.click()
+                  URL.revokeObjectURL(url)
+                }}
+              >
+                Download Debug Log
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

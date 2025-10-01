@@ -1,4 +1,3 @@
-// app/margin-results/[runId]/page.tsx
 "use client"
 
 import { useEffect, useState } from "react"

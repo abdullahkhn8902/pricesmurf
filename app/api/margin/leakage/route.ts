@@ -243,50 +243,73 @@ export async function POST(request: Request) {
     const leakage_rules = body?.leakage_rules ?? ["net_price < cost", "margin_pct < 5", "discount_pct > 50"]
     const priority_threshold = body?.priority_threshold ?? 1000
 
-    const sampleData = data.slice(0, 50)
+    const sampleData = data.slice(0, 200)
     const dataString = JSON.stringify({ columns, data: sampleData }, null, 2)
-    const prompt = `Identify margin leakage in this dataset:
+    const prompt = `You are an expert revenue optimization analyst. Identify ALL margin leakage instances in this ACTUAL dataset.
 
-Data:
+DATASET COLUMNS: ${JSON.stringify(columns)}
+DATASET SAMPLE (${sampleData.length} rows from ${data.length} total):
 ${dataString}
 
-Apply these leakage rules: ${JSON.stringify(leakage_rules)}
-Priority threshold (min revenue impact): ${priority_threshold}
+LEAKAGE DETECTION RULES:
+${JSON.stringify(leakage_rules)}
 
-Identify specific instances where margins are being lost and quantify the impact.
+ANALYSIS REQUIREMENTS:
+1. Find EVERY instance where products are sold below cost (net_price < cost)
+2. Identify excessive discounts that erode margins
+3. Calculate the ACTUAL financial impact per instance
+4. Group leakage by type and severity
+5. Identify specific product-customer pairs with issues
 
-Provide analysis in this JSON format:
+CRITICAL: Use ONLY actual data from the dataset. Extract real product IDs, customer IDs, prices, and costs. Calculate real loss amounts.
+
+Return ONLY valid JSON in this exact format:
 {
-  "leakage_instances": number,
-  "revenue_impact": number,
+  "leakage_instances": <actual count of margin leaks found>,
+  "revenue_impact": <total $ lost, calculated from actual data>,
   "leakage_types": {
-    "below_cost_sales": {"count": number, "impact": number},
-    "excessive_discounts": {"count": number, "impact": number},
-    "low_margin_products": {"count": number, "impact": number}
+    "below_cost_sales": {
+      "count": <actual count where net_price < cost>,
+      "impact": <$ amount lost>
+    },
+    "excessive_discounts": {
+      "count": <actual count where discount > 50%>,
+      "impact": <$ amount lost>
+    },
+    "low_margin_products": {
+      "count": <actual count where margin < 5%>,
+      "impact": <$ amount at risk>
+    }
   },
   "top_leaks": [
     {
-      "product_id": "P015",
-      "customer_id": "C123", 
-      "leak_type": "below_cost_sale",
-      "net_price": 45,
-      "cost": 50,
-      "loss_per_unit": 5,
-      "quantity": 100,
-      "total_impact": 500
+      "product_id": "<actual product ID from data>",
+      "customer_id": "<actual customer ID from data>",
+      "leak_type": "<below_cost_sale|excessive_discount|low_margin>",
+      "net_price": <actual net_price from data>,
+      "cost": <actual cost from data>,
+      "list_price": <actual list_price if available>,
+      "discount_pct": <calculated from data>,
+      "loss_per_unit": <calculated: cost - net_price>,
+      "quantity": <actual quantity from data>,
+      "total_impact": <loss_per_unit * quantity>
     }
   ],
-  "insights": ["Product P015 sold below cost for 5 customers", "High discounts in electronics category"],
-  "sql": "SELECT query to find all margin leaks",
-  "samples": [{"product_id": "...", "issue": "below_cost", "impact": 500}]
+  "insights": [
+    "<specific insight about actual leakage patterns>",
+    "<which products/customers have the most leakage>",
+    "<root cause analysis from the data>"
+  ],
+  "sql": "SELECT product_id, customer_id, net_price, cost, quantity, (cost - net_price) * quantity as total_loss FROM pricing_data WHERE net_price < cost OR (list_price - net_price) / list_price > 0.5 ORDER BY total_loss DESC LIMIT 100",
+  "samples": [<array of 10-20 actual rows showing margin leakage>]
 }`
 
-    const model = vertexAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" })
+    const model = vertexAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" })
 
     logger.info("Calling Vertex AI (generateContent)", {
       request_id: requestId,
       user_id: clerkUserId,
-      model: "gemini-2.5-flash-lite",
+      model: "gemini-2.0-flash-exp",
       masked_token: maskSecret(process.env.VERTEX_AI_KEY ?? process.env.GOOGLE_APPLICATION_CREDENTIALS),
     })
 
@@ -331,35 +354,38 @@ Provide analysis in this JSON format:
     // Extract text generically
     const responseText =
       result?.response?.candidates?.[0]?.content?.parts?.[0]?.text ?? result?.output?.[0]?.content?.[0]?.text ?? null
-    const analysisRaw: string = responseText ?? "No analysis generated"
+    const analysisRaw: string = responseText ?? ""
 
     let parsedAnalysis: any = null
     try {
-      parsedAnalysis = JSON.parse(analysisRaw)
-    } catch {
-      logger.info("Vertex returned non-JSON analysis; returning raw text", { request_id: requestId })
-      parsedAnalysis = {
-        leakage_instances: Math.floor(data.length * 0.15),
-        revenue_impact: 25000,
-        leakage_types: {
-          below_cost_sales: { count: Math.floor(data.length * 0.05), impact: 8000 },
-          excessive_discounts: { count: Math.floor(data.length * 0.08), impact: 12000 },
-          low_margin_products: { count: Math.floor(data.length * 0.02), impact: 5000 },
-        },
-        top_leaks: data.slice(0, 5).map((row: any, i: number) => ({
-          product_id: row.product_id || `P${i + 15}`,
-          customer_id: row.customer_id || `C${i + 123}`,
-          leak_type: i % 3 === 0 ? "below_cost_sale" : i % 3 === 1 ? "excessive_discount" : "low_margin",
-          net_price: 45 + i * 5,
-          cost: 50 + i * 3,
-          loss_per_unit: 5 + i,
-          quantity: 100 - i * 10,
-          total_impact: (5 + i) * (100 - i * 10),
-        })),
-        insights: ["Margin leakage analysis completed", "Review below-cost sales and excessive discounts"],
-        sql: "SELECT * FROM pricing_data WHERE net_price < cost OR margin_pct < 5 OR discount_pct > 50",
-        samples: data.slice(0, 5),
+      let jsonText = analysisRaw.trim()
+      if (jsonText.includes("```json")) {
+        const match = jsonText.match(/```json\s*([\s\S]*?)\s*```/)
+        if (match) jsonText = match[1].trim()
+      } else if (jsonText.includes("```")) {
+        const match = jsonText.match(/```\s*([\s\S]*?)\s*```/)
+        if (match) jsonText = match[1].trim()
       }
+
+      parsedAnalysis = JSON.parse(jsonText)
+
+      if (!parsedAnalysis.leakage_instances || !Array.isArray(parsedAnalysis.top_leaks)) {
+        throw new Error("Invalid response structure from Gemini")
+      }
+    } catch (parseErr) {
+      logger.error("Failed to parse Gemini leakage response as valid JSON", {
+        request_id: requestId,
+        error: String(parseErr),
+        response_preview: analysisRaw.substring(0, 500),
+      })
+      return NextResponse.json(
+        {
+          error: "AI analysis failed to return valid leakage data",
+          details: "The AI model did not return properly structured margin leakage analysis. Please try again.",
+          raw_response: process.env.NODE_ENV === "development" ? analysisRaw : undefined,
+        },
+        { status: 500 },
+      )
     }
 
     // Persist analysis

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { LoaderSequence } from "@/components/loader-sequence"
-import { ResultsView } from "@/components/results-view"
 import { AlertCircle, FileSpreadsheet } from "lucide-react"
 
 interface DataQualityModalProps {
@@ -16,7 +15,7 @@ interface DataQualityModalProps {
   onClose: () => void
 }
 
-type ModalState = "file-selection" | "validation-error" | "loading" | "results"
+type ModalState = "file-selection" | "validation-error" | "loading"
 
 interface ValidationError {
   missing_columns: string[]
@@ -54,14 +53,14 @@ export function DataQualityModal({ isOpen, onClose }: DataQualityModalProps) {
         const res = await fetch("/api/files", { signal: controller.signal })
         if (!res.ok) throw new Error(`Failed to fetch files (${res.status})`)
         const json = await res.json()
-        const normalized = (Array.isArray(json) ? json : []).map((f: any) => ({
-          id: String(f.id ?? f.fileId ?? f._id ?? f.filename ?? f.name ?? ""),
-          name: String(f.filename ?? f.name ?? f.id ?? f.fileId ?? ""),
-          type:
-            f.type ??
-            (/\.(xlsx|xls)/i.test(String(f.filename ?? f.name ?? "")) ? "XLSX" : "CSV"),
-          readOnly: !!f.readOnly,
-        })).filter((f: any) => f.id)
+        const normalized = (Array.isArray(json) ? json : [])
+          .map((f: any) => ({
+            id: String(f.id ?? f.fileId ?? f._id ?? f.filename ?? f.name ?? ""),
+            name: String(f.filename ?? f.name ?? f.id ?? f.fileId ?? ""),
+            type: f.type ?? (/\.(xlsx|xls)/i.test(String(f.filename ?? f.name ?? "")) ? "XLSX" : "CSV"),
+            readOnly: !!f.readOnly,
+          }))
+          .filter((f: any) => f.id)
 
         if (!cancelled) {
           if (normalized.length > 0) {
@@ -128,7 +127,7 @@ export function DataQualityModal({ isOpen, onClose }: DataQualityModalProps) {
           columns: fileDetails.columns,
           data: fileDetails.data,
           preview: true,
-          fileId: selectedFile
+          fileId: selectedFile,
         }),
       })
 
@@ -136,7 +135,7 @@ export function DataQualityModal({ isOpen, onClose }: DataQualityModalProps) {
       if (!validateRes.ok || !validateJson.validation_passed) {
         setValidationError({
           missing_columns: validateJson?.missing_columns ?? [],
-          message: validateJson?.message ?? `Validation failed (${validateRes.status})`
+          message: validateJson?.message ?? `Validation failed (${validateRes.status})`,
         })
         setModalState("validation-error")
         return
@@ -163,7 +162,7 @@ export function DataQualityModal({ isOpen, onClose }: DataQualityModalProps) {
       console.error("Validation / run creation failed:", err)
       setValidationError({
         missing_columns: [],
-        message: `Failed to validate/create run: ${String(err?.message ?? err)}`
+        message: `Failed to validate/create run: ${String(err?.message ?? err)}`,
       })
       setModalState("validation-error")
     } finally {
@@ -187,7 +186,6 @@ export function DataQualityModal({ isOpen, onClose }: DataQualityModalProps) {
         console.warn("Failed to save final results to server (non-fatal):", e)
       })
 
-      // close modal and navigate to results page
       handleClose()
       router.push(`/results/${useRunId}`)
     } catch (e: any) {
@@ -323,10 +321,6 @@ export function DataQualityModal({ isOpen, onClose }: DataQualityModalProps) {
             onComplete={handleLoadingComplete}
             onError={handleLoadingError}
           />
-        )}
-
-        {modalState === "results" && results && (
-          <ResultsView results={results} fileName={selectedFile} onClose={handleClose} />
         )}
       </DialogContent>
     </Dialog>

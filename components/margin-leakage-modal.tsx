@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { MarginLoaderSequence } from "@/components/margin-loader-sequence"
-import { MarginResultsView } from "@/components/margin-results-view"
 import { AlertCircle, FileSpreadsheet } from "lucide-react"
 
 interface MarginLeakageModalProps {
@@ -103,7 +102,10 @@ export function MarginLeakageModal({ isOpen, onClose }: MarginLeakageModalProps)
   const handleRunAgent = async () => {
     if (!selectedFile) return
     if (!isRealSelection) {
-      setValidationError({ missing_columns: [], message: "Please select a valid uploaded file (not a demo/mock file)." })
+      setValidationError({
+        missing_columns: [],
+        message: "Please select a valid uploaded file (not a demo/mock file).",
+      })
       setModalState("validation-error")
       return
     }
@@ -196,15 +198,14 @@ export function MarginLeakageModal({ isOpen, onClose }: MarginLeakageModalProps)
       })
 
       setServerRunId(useRunId)
-      setResults(finalResults)
-      setModalState("results")
+      handleClose()
       router.push(`/margin-results/${useRunId}`)
     } catch (e: any) {
       console.error("handleLoadingComplete error:", e)
+      handleClose()
       router.push(`/margin-results/${useRunId}`)
     }
   }
-
 
   const handleLoadingError = (error: string) => {
     setValidationError({ missing_columns: [], message: error })
@@ -337,10 +338,6 @@ export function MarginLeakageModal({ isOpen, onClose }: MarginLeakageModalProps)
             onComplete={handleLoadingComplete}
             onError={handleLoadingError}
           />
-        )}
-
-        {modalState === "results" && results && (
-          <MarginResultsView results={results} fileName={selectedFile} onClose={handleClose} />
         )}
       </DialogContent>
     </Dialog>
