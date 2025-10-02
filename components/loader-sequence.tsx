@@ -8,7 +8,6 @@ import { Loader2, Check, X, RotateCcw, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 // @ts-ignore
 import { Hourglass } from "ldrs/react"
-import "ldrs/react/Hourglass.css"
 
 interface LoaderSequenceProps {
   fileId: string
@@ -307,28 +306,7 @@ export function LoaderSequence({ fileId, runId, onComplete, onError }: LoaderSeq
                   </>
                 )}
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  // Download debug log functionality
-                  const debugData = {
-                    fileId,
-                    runId,
-                    steps: stepResults,
-                    timestamp: new Date().toISOString(),
-                  }
-                  const blob = new Blob([JSON.stringify(debugData, null, 2)], { type: "application/json" })
-                  const url = URL.createObjectURL(blob)
-                  const a = document.createElement("a")
-                  a.href = url
-                  a.download = "debug-log.json"
-                  a.click()
-                  URL.revokeObjectURL(url)
-                }}
-              >
-                Download Debug Log
-              </Button>
+
             </div>
           )}
         </>

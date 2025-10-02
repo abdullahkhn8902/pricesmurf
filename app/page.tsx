@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Hourglass } from "ldrs/react";
+import "ldrs/react/Hourglass.css"
 
 export default function Home() {
   const { isSignedIn, isLoaded, user } = useUser();

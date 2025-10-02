@@ -301,19 +301,19 @@ Return ONLY valid JSON in this exact format:
   "samples": [<array of 5-10 actual rows with pricing issues>]
 }`
 
-    const model = vertexAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" })
+    const model = vertexAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" })
 
     logger.info("Calling Vertex AI for pricing analysis", {
       request_id: requestId,
       user_id: clerkUserId,
-      model: "gemini-2.0-flash-exp",
+      model: "gemini-2.5-flash-lite",
     })
 
     const startTs = Date.now()
     logger.info("vertex_call_start", {
       request_id: requestId,
       user_id: clerkUserId,
-      model: "gemini-2.0-flash-exp",
+      model: "gemini-2.5-flash-lite",
       masked_token: maskSecret(process.env.VERTEX_AI_KEY || process.env.GOOGLE_APPLICATION_CREDENTIALS || "sa-key"),
       note: "pricing_analysis_start",
     })
@@ -339,7 +339,7 @@ Return ONLY valid JSON in this exact format:
       logger.info("Vertex AI pricing analysis successful", {
         request_id: requestId,
         user_id: clerkUserId,
-        model: "gemini-2.0-flash-exp",
+        model: "gemini-2.5-flash-lite",
         duration_ms: durationMs,
         prompt_tokens: promptTokens,
         candidates_tokens: candidatesTokens,
@@ -388,7 +388,7 @@ Return ONLY valid JSON in this exact format:
           .collection("pricingAnalyses")
           .updateOne(
             { fileId: resolvedFileId, userId: clerkUserId },
-            { $set: { analysis: analysisObj, updatedAt: new Date(), model: "gemini-2.0-flash-exp" } },
+            { $set: { analysis: analysisObj, updatedAt: new Date(), model: "gemini-2.5-flash-lite" } },
             { upsert: true },
           )
         logger.info("Analysis stored in database", {
@@ -409,7 +409,7 @@ Return ONLY valid JSON in this exact format:
         logger.info("vertex_call_end", {
           request_id: requestId,
           user_id: clerkUserId,
-          model: "gemini-2.0-flash-exp",
+          model: "gemini-2.5-flash-lite",
           duration_ms: durationMs,
           analysis_length: rawText.length,
           note: "vertex_call_end",
@@ -446,7 +446,7 @@ Return ONLY valid JSON in this exact format:
       logger.error("vertex_call_error", {
         request_id: requestId,
         user_id: clerkUserId,
-        model: "gemini-2.0-flash-exp",
+        model: "gemini-2.5-flash-lite",
         duration_ms: durationMs,
         error: vErr?.message || String(vErr),
         note: "pricing_analysis_error",

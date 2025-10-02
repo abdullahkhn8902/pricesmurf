@@ -49,7 +49,7 @@ const agents = [
     id: "performance",
     title: "Opportunity Agent",
     description: "Suggest where we can increase price or upsell.",
-    specialty: "Query optimization, index recommendations",
+    specialty: "Boost pricing with faster queries",
     icon: TrendingUp,
     color: "bg-orange-500",
     available: false,
@@ -58,11 +58,13 @@ const agents = [
     id: "schema",
     title: "Win Loss Agent",
     description: "Analyze deals marked as won or lost and find patterns.",
-    specialty: "Schema validation, normalization suggestions",
+    specialty: "Fix data, reveal deal patterns",
     icon: FileCheck,
     color: "bg-purple-500",
     available: false,
-  },
+  }
+
+
 ]
 
 // Create inner component for Sidebar that uses useSearchParams

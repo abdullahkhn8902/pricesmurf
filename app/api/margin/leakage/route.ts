@@ -304,12 +304,12 @@ Return ONLY valid JSON in this exact format:
   "samples": [<array of 10-20 actual rows showing margin leakage>]
 }`
 
-    const model = vertexAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" })
+    const model = vertexAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" })
 
     logger.info("Calling Vertex AI (generateContent)", {
       request_id: requestId,
       user_id: clerkUserId,
-      model: "gemini-2.0-flash-exp",
+      model: "gemini-2.5-flash-lite",
       masked_token: maskSecret(process.env.VERTEX_AI_KEY ?? process.env.GOOGLE_APPLICATION_CREDENTIALS),
     })
 

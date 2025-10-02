@@ -36,10 +36,7 @@ function tryParseJSON(maybe: any) {
   return null
 }
 
-/**
- * Build a canonical flattened analysis object that MarginResultsView expects.
- * Accepts many shapes (analysis.pricing, analysis.costs, analysis.leakage, analysis.samples, or already-flat).
- */
+
 function normalizeMarginAnalysis(rawInput: any) {
   if (!rawInput) return null
 
@@ -311,7 +308,7 @@ export default function MarginResultsPage() {
             <CardDescription>The analysis results could not be found.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Link href="/app-pages/agents">
+            <Link href="/app-pages/dashboard">
               <Button className="w-full">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Agents
@@ -328,14 +325,14 @@ export default function MarginResultsPage() {
       <div className="border-b bg-card">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center gap-4">
-            <Link href="/app-pages/agents">
+            <Link href="/app-pages/dashboard">
               <Button variant="outline" size="sm">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Agents
               </Button>
             </Link>
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Margin Leakage Analysis Results</h1>
+              <h1 className="text-3xl font-bold  text-indigo-900">Margin Leakage Analysis Results</h1>
               <p className="text-muted-foreground mt-1">Run ID: {runId}</p>
             </div>
           </div>

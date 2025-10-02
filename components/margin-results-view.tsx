@@ -335,6 +335,13 @@ export function MarginResultsView({ results, fileName: initialFileName, onClose 
     )
   }
 
+  // compute severity total for 4th card
+  const severityTotal =
+    safeNumber(severitySummary.critical) +
+    safeNumber(severitySummary.high) +
+    safeNumber(severitySummary.medium) +
+    safeNumber(severitySummary.low)
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -355,39 +362,39 @@ export function MarginResultsView({ results, fileName: initialFileName, onClose 
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+      {/* Summary Cards - refactored to Data Quality style (4 gradient cards) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
           <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-red-500" />
+            <div className="flex items-center gap-3">
+              <DollarSign className="h-8 w-8 text-blue-600" />
               <div>
-                <p className="text-sm text-muted-foreground">Total Loss</p>
-                <p className="text-lg font-bold text-red-600">${totalLoss.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-blue-900">${totalLoss.toLocaleString()}</p>
+                <p className="text-sm text-blue-700">Total Loss</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200">
           <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-orange-500" />
+            <div className="flex items-center gap-3">
+              <Package className="h-8 w-8 text-amber-600" />
               <div>
-                <p className="text-sm text-muted-foreground">Products Below Cost</p>
-                <p className="text-lg font-bold">{productsAffected}</p>
+                <p className="text-2xl font-bold text-amber-900">{productsAffected}</p>
+                <p className="text-sm text-amber-700">Products Below Cost</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200">
           <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-blue-500" />
+            <div className="flex items-center gap-3">
+              <Users className="h-8 w-8 text-red-600" />
               <div>
-                <p className="text-sm text-muted-foreground">Customers Affected</p>
-                <p className="text-lg font-bold">{customersAffected}</p>
+                <p className="text-2xl font-bold text-red-900">{customersAffected}</p>
+                <p className="text-sm text-red-700">Customers Affected</p>
               </div>
             </div>
           </CardContent>
@@ -519,7 +526,6 @@ export function MarginResultsView({ results, fileName: initialFileName, onClose 
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="remediation">Remediation</TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="space-y-4">
@@ -721,55 +727,6 @@ export function MarginResultsView({ results, fileName: initialFileName, onClose 
           </Card>
         </TabsContent>
 
-        <TabsContent value="remediation" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Remediation Suggestions</CardTitle>
-              <CardDescription>Recommended actions to address margin leakage</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {Array.isArray(resultsData?.remediation_suggestions) && resultsData.remediation_suggestions.length > 0 ? (
-                <div className="space-y-3">
-                  {resultsData.remediation_suggestions.map((suggestion: any, index: number) => (
-                    <div key={index} className="p-4 border rounded-lg">
-                      <div className="flex items-start justify-between mb-2">
-                        <h4 className="font-medium">{suggestion.type}</h4>
-                        <Badge variant="outline">
-                          {Math.round(safeNumber(suggestion.confidence) * 100)}% confidence
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2">{suggestion.description}</p>
-                      <p className="text-sm font-medium">Impact: {suggestion.impact_estimate}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">No remediation suggestions available</div>
-              )}
-
-              <Separator />
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-3 bg-red-50 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Critical</p>
-                  <p className="text-lg font-bold text-red-600">{severitySummary.critical}</p>
-                </div>
-                <div className="text-center p-3 bg-orange-50 rounded-lg">
-                  <p className="text-sm text-muted-foreground">High</p>
-                  <p className="text-lg font-bold text-orange-600">{severitySummary.high}</p>
-                </div>
-                <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Medium</p>
-                  <p className="text-lg font-bold text-yellow-600">{severitySummary.medium}</p>
-                </div>
-                <div className="text-center p-3 bg-green-50 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Low</p>
-                  <p className="text-lg font-bold text-green-600">{severitySummary.low}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </div>
   )

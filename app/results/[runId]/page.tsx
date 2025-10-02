@@ -566,7 +566,7 @@ export default function ResultsPage() {
               Back to Agents
             </Button>
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-foreground">Data Quality Analysis Results</h1>
+              <h1 className="text-3xl font-bold text-indigo-900">Data Quality Analysis Results</h1>
               <p className="text-muted-foreground mt-1">
                 Comprehensive analysis completed • Run ID: {runId}
                 {results.meta?.fileId && ` • File ID: ${results.meta.fileId}`}

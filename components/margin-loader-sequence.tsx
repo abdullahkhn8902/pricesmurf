@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils"
 
 // @ts-ignore
 import { Hourglass } from "ldrs/react"
-import "ldrs/react/Hourglass.css"
 
 interface MarginLoaderSequenceProps {
   fileId: string
@@ -60,7 +59,7 @@ export function MarginLoaderSequence({ fileId, runId, onComplete, onError }: Mar
       clearTimeout(t)
       try {
         abortRef.current?.abort()
-      } catch {}
+      } catch { }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileId, runId])
@@ -128,14 +127,16 @@ export function MarginLoaderSequence({ fileId, runId, onComplete, onError }: Mar
       // Save raw result object into accumRef to guarantee it's present later
       accumRef.current[step.id] = result
 
-      // Create a human-friendly summary if possible
       let summary = ""
       switch (step.id) {
         case "pricing":
-          summary = `Products: ${result.total_products ?? result.pricing_count ?? "N/A"}, avg discount: ${result.avg_discount_pct ?? "N/A"}`
+          // Extract from analysis object if present
+          const pricingAnalysis = result.analysis || result
+          summary = `Products: ${pricingAnalysis.total_products ?? result.total_products ?? result.pricing_count ?? 0}, avg discount: ${pricingAnalysis.avg_discount_pct ?? result.avg_discount_pct ?? 0}%`
           break
         case "costs":
-          summary = `Avg margin: ${result.avg_margin_pct ?? "N/A"}%`
+          const costsAnalysis = result.analysis || result
+          summary = `Avg margin: ${costsAnalysis.avg_margin_pct ?? result.avg_margin_pct ?? 0}%`
           break
         case "leakage":
           summary = `${result.leakage_instances ?? result.leakage_count ?? 0} leakage(s) found`
@@ -208,11 +209,11 @@ export function MarginLoaderSequence({ fileId, runId, onComplete, onError }: Mar
       severity_summary: recommendationsData.severity_summary ??
         acc.segments?.severity_summary ??
         acc.leakage?.severity_summary ?? {
-          critical: priorityActions.filter((a: any) => a.priority === "critical").length,
-          high: priorityActions.filter((a: any) => a.priority === "high").length + quickWins.length,
-          medium: priorityActions.filter((a: any) => a.priority === "medium").length,
-          low: priorityActions.filter((a: any) => a.priority === "low").length,
-        },
+        critical: priorityActions.filter((a: any) => a.priority === "critical").length,
+        high: priorityActions.filter((a: any) => a.priority === "high").length + quickWins.length,
+        medium: priorityActions.filter((a: any) => a.priority === "medium").length,
+        low: priorityActions.filter((a: any) => a.priority === "low").length,
+      },
       sql_queries: {
         below_cost: acc.leakage?.sql ?? acc.pricing?.sql ?? acc.segments?.sql ?? "",
         low_margin: acc.pricing?.sql ?? "",

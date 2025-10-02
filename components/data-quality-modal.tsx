@@ -221,8 +221,30 @@ export function DataQualityModal({ isOpen, onClose }: DataQualityModalProps) {
           <DialogTitle className="text-center text-xl font-bold">DATA QUALITY AGENT</DialogTitle>
         </DialogHeader>
 
+
+
         {modalState === "file-selection" && (
           <div className="space-y-6 py-4">
+            <div className="bg-muted p-4 rounded-lg border">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5">
+                  <AlertCircle className="h-5 w-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="font-semibold">Required fields for this agent</p>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    The agent needs three canonical columns so it can find Quality of Data:
+                  </p>
+
+                  <div className="flex gap-2 flex-wrap mb-3">
+                    <Badge className="px-2 py-0.5">product_id</Badge>
+                    <Badge className="px-2 py-0.5">customer_id</Badge>
+                    <Badge className="px-2 py-0.5">price / net_price</Badge>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium">Select File</label>
               <Select value={selectedFile} onValueChange={setSelectedFile}>
