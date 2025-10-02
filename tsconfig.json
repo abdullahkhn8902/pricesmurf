@@ -35,7 +35,8 @@
     ".next/types/**/*.ts",
     "next.config.mjs",
     "app/api/margin/pricing/route.ts",
-    "app/api/margin/recommendations/route.ts"
+    "app/api/margin/recommendations/route.ts",
+    "app/api/run/logical/route.js"
   ],
   "exclude": [
     "node_modules"
